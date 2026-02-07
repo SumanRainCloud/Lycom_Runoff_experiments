@@ -176,10 +176,19 @@ rH2Ol_g2(:,:)                   = 0.0                                   ! water 
 do i = 1, nCPts3
   do t = 1, p_ntiles
     Wx(i,t)    = 0.5 * por * 0.65
+    if (Wx(i,t) .le. 0.0 .or. Wx(i,t) .ne. Wx(i,t)) then
+      write(*,*) "WARNING: Invalid Wx at rank=", rank, " i=", i, " t=", t
+      Wx(i,t) = 0.15  ! Fallback value
+    endif
+
     xT_g0(i,t) = 288.0
 
     do l = 1,nsoil
       W_c0(i,t,l) = 0.5 * por * 0.03
+      if (W_c0(i,t,l) .le. 0.0 .or. W_c0(i,t,l) .ne. W_c0(i,t,l)) then
+        write(*,*) "WARNING: Invalid W_c0 at rank=", rank, " i=", i, " t=", t, " l=", l
+        W_c0(i,t,l) = 0.015  ! Fallback value
+      endif
     enddo
   enddo
 enddo

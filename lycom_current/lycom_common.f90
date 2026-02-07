@@ -967,13 +967,7 @@ do i = 1,nCPts2
   ag_area_s(i,:)                = ag_area_s(i,:) / real(naccu(i))
   !ag_fH2Ol_lsat(i,:)            = ag_fH2Ol_lsat(i,:) / real(naccu(i))
   
-  if (naccu(i) > 0) then
-    ag_fH2Ol_runoff_l(i,:) = ag_fH2Ol_runoff_l(i,:)/real(naccu(i), kind(1.0d0))
-  else
-    ag_fH2Ol_runoff_l(i,:) = -9999.0   ! or 0.0d0, whichever your convention is
-  end if
-
-!ag_fH2Ol_runoff_l(i,:)        = ag_fH2Ol_runoff_l(i,:)/real(naccu(i))
+  ag_fH2Ol_runoff_l(i,:) = ag_fH2Ol_runoff_l(i,:) / real(naccu(i))
   ag_fCc_gpp(i,:)               = ag_fCc_gpp(i,:)/real(naccu(i))
   ag_fCc_npp(i,:)               = ag_fCc_npp(i,:)/real(naccu(i))
   ag_fH2Ol_bsat(i,:)            = ag_fH2Ol_bsat(i,:) / real(naccu(i))

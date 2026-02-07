@@ -1387,6 +1387,7 @@ do j = 1,p_nspec
     fH2Ol_xd(j)=0.0
     npp0(i,j)=0.0
     gpp0(i,j)=0.0
+    Run_tot(i,t,j) = 0.0 
   endif
 enddo
 
