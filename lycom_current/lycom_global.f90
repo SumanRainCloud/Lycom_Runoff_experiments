@@ -64,13 +64,13 @@ integer                 :: i,k,l
 integer                 :: mperr
 integer                 :: ovID1
 integer, dimension(1)   :: tcode
-real                    :: test_val
+real(dp)                    :: test_val
 
-real, dimension(pp) :: var0
+real(dp), dimension(pp) :: var0
 
-real, allocatable, dimension(:) :: var1      !(ppnp)
-real, allocatable, dimension(:) :: outvarL   !(nland)
-real, allocatable, dimension(:,:) :: outvar    !(nx,ny)
+real(dp), allocatable, dimension(:) :: var1      !(ppnp)
+real(dp), allocatable, dimension(:) :: outvarL   !(nland)
+real(dp), allocatable, dimension(:,:) :: outvar    !(nx,ny)
 
 allocate(var1(ppnp))
 allocate(outvarL(nland))
@@ -710,8 +710,8 @@ implicit none
 
 integer :: m, mperr
 
-real, allocatable :: laimon(:)
-real, allocatable :: saimon(:)
+real(dp), allocatable :: laimon(:)
+real(dp), allocatable :: saimon(:)
 
 allocate(laimon(pp))
 allocate(saimon(pp))
@@ -946,6 +946,8 @@ counter=1
 !write(*,*) "Proc: in readHourG ",rank, " indv",size(indvec)
 !write(*,*)"indvec 1 ", indvec(:,1)
 !write(*,*)"indvec 2 ", indvec(:,2)
+
+
 do c = 1,7
   !write(*,*) "c is",c
   call check(nf90_inq_varID(ncID0(c), varName, varID))
@@ -973,6 +975,23 @@ do c = 1,7
     k = k + ppvec(i)
   enddo
 enddo
+
+! When you open the rain NetCDF file:
+character(len=128) :: units_str
+integer :: varID_rain
+
+! After opening the file and getting the variable ID:
+call check(nf90_inq_varid(ncID0(4), "rain", varID_rain))
+
+! Read the units attribute:
+call check(nf90_get_att(ncID0(4), varID_rain, "units", units_str))
+
+! Print it:
+if (rank .eq. 0) then
+  write(*,*) "================================================================"
+  write(*,*) "CRITICAL: Rain units from NetCDF = '", trim(units_str), "'"
+  write(*,*) "================================================================"
+endif
 !write(*,*) "reading for h is done"
 return
 end subroutine lycom_readHourG
@@ -987,6 +1006,7 @@ use mpi
 implicit none
 
 integer :: mperr
+
 
 call MPI_BARRIER(MPI_COMM_WORLD, mperr)
 
@@ -1167,7 +1187,7 @@ do k = 1,1
   call write_varG(ag_fH2Ol_ux(:,k)  , outvarID(12+25*(k-1)))
   !call write_varG(ag_fH2Ol_lsat(:,k), outvarID(13+25*(k-1)))
   !call write_varG(ag_fH2Ol_bsat(:,k), outvarID(14+25*(k-1)))
-  call write_varG(ag_fH2Ol_runoff_l(:,k), outvarID(15+25*(k-1)))
+  !call write_varG(ag_fH2Ol_runoff_l(:,k), outvarID(15+25*(k-1)))
   call write_varG(ag_fCc_gpp(:,k)   , outvarID(16+25*(k-1)))
   call write_varG(ag_fCc_npp(:,k)   , outvarID(17+25*(k-1)))
   call write_varG(ag_fH2Ol_xd(:,k)  , outvarID(18+25*(k-1)))
