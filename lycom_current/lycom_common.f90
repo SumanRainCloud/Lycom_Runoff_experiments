@@ -251,7 +251,7 @@ Br(nCPts,p_nspec,nsoil), &
 !
 ah_areaTH_s(p_nhabM), &
 ah_area_s(p_nhabM), &
-!ah_fH2Ol_lsat(p_nhabM), &
+ah_fH2Ol_lsat(p_nhabM), &
 ah_fH2Ol_runoff_l(p_nhabM), &
 ah_fCc_gpp(p_nhabM), &
 ah_fCc_npp(p_nhabM), &
@@ -282,7 +282,7 @@ ah_fCbo(p_nhabM), &
 !
 av_areaTH_s(p_nvertM), &
 av_area_s(p_nvertM), &
-!av_fH2Ol_lsat(p_nvertM), &
+av_fH2Ol_lsat(p_nvertM), &
 av_fH2Ol_runoff_l(p_nvertM), &
 av_fCc_gpp(p_nvertM), &
 av_fCc_npp(p_nvertM), &
@@ -311,7 +311,7 @@ av_fCbo(p_nvertM), &
 !
 at_fH2Ol_ux(p_ntiles,1), &
 at_fH2Ol_xd(p_ntiles,1), &
-!at_fH2Ol_lsat(p_ntiles,1), &
+at_fH2Ol_lsat(p_ntiles,1), &
 at_fH2Ol_runoff_l(p_ntiles,1), &
 at_fCc_gpp(p_ntiles,1), &
 at_fCc_npp(p_ntiles,1), &
@@ -358,7 +358,7 @@ ag_fH2Ol_xd(nCPts,p_ntiles), &
 ag_areaTH_s(nCPts,p_ntiles), &
 ag_area_s(nCPts,p_ntiles), &
 ag_fH2Ol_bsat(nCPts,p_ntiles), &
-!ag_fH2Ol_lsat(nCPts,p_ntiles), &
+ag_fH2Ol_lsat(nCPts,p_ntiles), &
 ag_fH2Ol_runoff_l(nCPts,p_ntiles), &
 ag_fCc_gpp(nCPts,p_ntiles), &
 ag_fCc_npp(nCPts,p_ntiles), &
@@ -591,7 +591,7 @@ Qin1, &
 !
 ah_areaTH_s, &
 ah_area_s, &
-!ah_fH2Ol_lsat, &
+ah_fH2Ol_lsat, &
 ah_fH2Ol_runoff_l, &
 ah_fCc_gpp, &
 ah_fCc_npp, &
@@ -623,7 +623,7 @@ ah_fCbo, &
 av_areaTH_s, &
 av_area_s, &
 av_rH2Ol, &
-!av_fH2Ol_lsat, &
+av_fH2Ol_lsat, &
 av_fH2Ol_runoff_l, &
 av_fCc_gpp, &
 av_fCc_npp, &
@@ -653,7 +653,7 @@ at_fH2Ol_ux, &
 at_fH2Ol_xd, &
 at_areaTH_s, &
 at_area_s, &
-!at_fH2Ol_lsat, &
+at_fH2Ol_lsat, &
 at_fH2Ol_runoff_l, &
 at_fCc_gpp, &
 at_fCc_npp, &
@@ -697,7 +697,7 @@ ag_fH2Ol_ux, &
 ag_fH2Ol_xd, &
 ag_areaTH_s, &
 ag_area_s, &
-!ag_fH2Ol_lsat, &
+ag_fH2Ol_lsat, &
 ag_fH2Ol_runoff_l, &
 ag_fCc_gpp, &
 ag_fCc_npp, &
@@ -814,7 +814,7 @@ implicit none
   ag_fH2Ol_xd(:,:)              = 0.0
 
   ag_area_s(:,:)                = 0.0
-  !ag_fH2Ol_lsat(:,:)            = 0.0
+  ag_fH2Ol_lsat(:,:)            = 0.0
   ag_fH2Ol_runoff_l(:,:)        = 0.0
   ag_fCc_gpp(:,:)               = 0.0
   ag_fCc_npp(:,:)               = 0.0
@@ -904,7 +904,7 @@ do i = 1,nCPts2
     ag_fH2Ol_xd(i,:)              = -9999.0  !ag_fH2Ol_xd(i,:) / real(naccu(i))
 
     ag_area_s(i,:)                =  -9999.0  !ag_area_s(i,:) / real(naccu(i))
-    !ag_fH2Ol_lsat(i,:)            = -9999.0   !ag_fH2Ol_lsat(i,:) / real(naccu(i))
+    ag_fH2Ol_lsat(i,:)            = -9999.0   !ag_fH2Ol_lsat(i,:) / real(naccu(i))
     ag_fH2Ol_runoff_l(i,:)        = -9999.0   !ag_fH2Ol_runoff_l(i,:)/real(naccu(i))
     ag_fCc_gpp(i,:)               = -9999.0   !ag_fCc_gpp(i,:)/real(naccu(i))
     ag_fCc_npp(i,:)               = -9999.0   !ag_fCc_npp(i,:)/real(naccu(i))
@@ -965,7 +965,7 @@ do i = 1,nCPts2
   ag_fH2Ol_xd(i,:)              = ag_fH2Ol_xd(i,:) / real(naccu(i))
 
   ag_area_s(i,:)                = ag_area_s(i,:) / real(naccu(i))
-  !ag_fH2Ol_lsat(i,:)            = ag_fH2Ol_lsat(i,:) / real(naccu(i))
+  ag_fH2Ol_lsat(i,:)            = ag_fH2Ol_lsat(i,:) / real(naccu(i))
   
   ag_fH2Ol_runoff_l(i,:)        = ag_fH2Ol_runoff_l(i,:)/real(naccu(i))
   ag_fCc_gpp(i,:)               = ag_fCc_gpp(i,:)/real(naccu(i))

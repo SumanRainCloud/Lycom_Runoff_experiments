@@ -420,7 +420,7 @@ integer :: i,t,v,h
 ! properties which are needed as input for other habitats / levels / tiles
 ! -> needed every time step !!
  
-ah_fH2Ol_xd(h)                  = 0.0!fH2Ol_xd_land* (1.0-as_area_s) + as_fH2Ol_runoff_l          !!!!!RUNOFF    *1000.0*c_year 
+ah_fH2Ol_xd(h)                  = fH2Ol_xd_land* (1.0-as_area_s) + as_fH2Ol_runoff_l          !!!!!RUNOFF    *1000.0*c_year 
                                 
 
 if (v .eq. 2 .and. h .eq. 1) then
@@ -449,7 +449,7 @@ if (writeout) then
   ah_Lai(h)                     = as_Lai + as_Lai * (1.0 - as_area_s)
   ah_rCb(h)                     = as_rCb + as_rCb * (1.0 - as_area_s)
 
-  !ah_fH2Ol_lsat(h)              =layer_con0*(1.0-as_area_s) + as_fH2Ol_lsat *as_area_s
+  ah_fH2Ol_lsat(h)              =layer_con0*(1.0-as_area_s) + as_fH2Ol_lsat *as_area_s
   
   ah_fH2Ol_runoff_l(h)          =Runoff_land*(1.0-as_area_s) + as_fH2Ol_runoff_l * as_area_s  
   
@@ -457,7 +457,7 @@ if (writeout) then
   
   ah_fCc_npp(h)                 = as_fCc_npp
 
-  !ah_fH2Ol_bsat(h)              =bucket_con0*(1.0-as_area_s)+as_fH2Ol_bsat * as_area_s
+  ah_fH2Ol_bsat(h)              =bucket_con0*(1.0-as_area_s)+as_fH2Ol_bsat * as_area_s
   ah_fCO2gc(h)                  = as_fCO2gc
   
   ah_fCcg(h)                    = as_fCcg
@@ -561,8 +561,8 @@ if (writeout) then
   
   !av_rH2Ol(v)                   = 0.0
   !av_rmaxH2Ol(v)                = 0.0
-  !av_fH2Ol_lsat(v)              = 0.0
-  !av_fH2Ol_bsat(v)              = 0.0
+  av_fH2Ol_lsat(v)              = 0.0
+  av_fH2Ol_bsat(v)              = 0.0
   !av_act(v)                     = 0.0
   av_rCO2d(v)                   = 0.0
 !  av_sCO2d(v)                   = 0.0
@@ -609,8 +609,8 @@ if (writeout) then
    
     ! average habitats per level (v)
     av_area_s(v)              =av_area_s(v) + ah_area_s(k) 
-    !av_fH2Ol_lsat(v)              = av_fH2Ol_lsat(v) + ah_fH2Ol_lsat(k) 
-    !av_fH2Ol_bsat(v)              =  av_fH2Ol_bsat(v) + ah_fH2Ol_bsat(k) 
+    av_fH2Ol_lsat(v)              = av_fH2Ol_lsat(v) + ah_fH2Ol_lsat(k) 
+    av_fH2Ol_bsat(v)              =  av_fH2Ol_bsat(v) + ah_fH2Ol_bsat(k) 
     av_fH2Ol_runoff_l(v)          = av_fH2Ol_runoff_l(v) + ah_fH2Ol_runoff_l(k) 
     av_fCc_gpp(v)                 = av_fCc_gpp(v) + ah_fCc_gpp(k)
     av_fCc_npp(v)                 = av_fCc_npp(v) + ah_fCc_npp(k)
@@ -714,8 +714,8 @@ if (writeout) then
     !at_rH2Ol(t,k)                  = av_rH2Ol(k) *ratioCG
     !at_rmaxH2Ol(t,k)               = av_rmaxH2Ol(k) *ratioCG
 
-    !at_fH2Ol_lsat(t,k)             = av_fH2Ol_lsat(k) *ratioCG
-    !at_fH2Ol_bsat(t,k)             = av_fH2Ol_bsat(k) *ratioCG
+    at_fH2Ol_lsat(t,k)             = av_fH2Ol_lsat(k) *ratioCG
+    at_fH2Ol_bsat(t,k)             = av_fH2Ol_bsat(k) *ratioCG
     at_fH2Ol_runoff_l(t,k)         = av_fH2Ol_runoff_l(k)*ratioCG
     at_fCc_gpp(t,k)                = av_fCc_gpp(k)*ratioCG
     at_fCc_npp(t,k)                = av_fCc_npp(k)*ratioCG
@@ -801,8 +801,8 @@ if (writeout) then
       !ag_rH2Ol(i,l)             = ag_rH2Ol(i,l)     + at_rH2Ol(k,l) * frac_tile(i,k)
       !ag_rmaxH2Ol(i,l)          = ag_rmaxH2Ol(i,l)  + at_rmaxH2Ol(k,l) * frac_tile(i,k)
       !ag_act(i,l)               = ag_act(i,l)       + at_act(k,l) * frac_tile(i,k)
-      !ag_fH2Ol_lsat(i,l)         = ag_fH2Ol_lsat(i,l) + at_fh2ol_lsat(k,l) 
-      !ag_fH2Ol_bsat(i,l)         = ag_fH2Ol_bsat(i,l) + at_fh2ol_bsat(k,l)
+      ag_fH2Ol_lsat(i,l)         = ag_fH2Ol_lsat(i,l) + at_fH2Ol_lsat(k,l) 
+      ag_fH2Ol_bsat(i,l)         = ag_fH2Ol_bsat(i,l) + at_fH2Ol_bsat(k,l)
       ag_fH2Ol_runoff_l(i,l)    = ag_fH2Ol_runoff_l(i,l) + at_fH2Ol_runoff_l(k,l) 
       ag_fCc_gpp(i,l)           = ag_fCc_gpp(i,l) + at_fCc_gpp(k,l)
       ag_fCc_npp(i,l)           =  ag_fCc_npp(i,l) + at_fCc_npp(k,l)
@@ -849,10 +849,6 @@ if (writeout) then
   ag_xT_a(i)                    =  ag_xT_a(i) + xT_a(i)
   ag_fH2Ol_ad(i)                =  ag_fH2Ol_ad(i) + fH2Ol_ad(i)! *1000.0*c_year
   ag_fRADs(i)                   = ag_fRADs(i) + fRADs_ad(i)
-  if (day .eq. dpm .and. ts .eq. tspd) then
-    ag_fH2Ol_runoff_l(i,:) = 0.0
-    ! etc.
-  endif
 endif
 
 return
