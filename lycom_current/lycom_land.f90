@@ -703,7 +703,7 @@ endif
 ! ------------------------------------------------------------------
 ! Frozen case
 ! ------------------------------------------------------------------
-if (xT_s0 .lt. c_TH2Osl) then
+if (xT_s0 .lt. c_TH2Osl-5) then
 
   S_2 = max(0.0, min(1.0, S_2))
 
@@ -721,19 +721,27 @@ if (xT_s0 .lt. c_TH2Osl) then
 ! Unfrozen case
 ! ------------------------------------------------------------------
 else
-
+  write(*,*) "DEBUG ENTER UNFROZEN rank=", rank, " i=", i, " t=", t
+  write(*,*) "Ta4=", Ta4, " desatdT=", desatdT, " c_gamma=", c_gamma
+  write(*,*) "Wx=", Wx(i,t), " Wxmax=", Wxmax
+  write(*,*) "p_dt=", p_dt, " p_rmaxH2Ol_g2=", p_rmaxH2Ol_g2
+  call flush(6)
   Rnet    = fRADs_ad(i)*0.85 + p_eps*fRADl_ad(i) - p_eps*c_sigma*Ta4
   ETpot_v = 1.4 * Rnet * desatdT / (desatdT + c_gamma) / c_HH2Olg / c_rhoH2Ol
   ETpot_v = max(0.0, ETpot_v)
-
+  write(*,*) "DEBUG AFTER ETpot_v rank=", rank, " i=", i, " t=", t, " ETpot_v=", ETpot_v
+  call flush(6)
   if (Wx(i,t) .gt. p_critD) then
     if (p_rmaxH2Ol_g2 .le. p_critD .or. p_rmaxH2Ol_g2 .ne. p_rmaxH2Ol_g2) then
       write(*,*) "FATAL: invalid p_rmaxH2Ol_g2"
       write(*,*) "rank=", rank, " i=", i, " t=", t, " p_rmaxH2Ol_g2=", p_rmaxH2Ol_g2
+      call flush(6)
       stop
     endif
 
-    rootuptk = min(Wx(i,t)/p_dt, p_kH2Ol_sv * (Wx(i,t)/p_rmaxH2Ol_g2)**2)
+    rootuptk = Wx(i,t) / p_dt
+    call flush(6)
+    rootuptk = min(rootuptk, p_kH2Ol_sv * (Wx(i,t) / p_rmaxH2Ol_g2)**2)
     rootuptk = max(0.0, rootuptk)
   else
     rootuptk = 0.0
@@ -780,6 +788,13 @@ else
     W_c0(i,t,l) = max(0.0, min(W_c0(i,t,l), Wmax))
 
     ! 3. Saturation
+    if (W_c0(i,t,l) .ne. W_c0(i,t,l)) then
+      write(*,*) "FATAL: W_c0 is NaN before saturation in land_stepvTrans"
+      write(*,*) "rank=", rank, " i=", i, " t=", t, " l=", l
+      write(*,*) "Qin=", Qin(i,t,l), " Q_Oflow=", Q_Oflow
+      stop
+    endif
+
     S_wc0 = W_c0(i,t,l) / Wmax
     S_wc0 = max(0.0, min(1.0, S_wc0))
 
@@ -790,8 +805,65 @@ else
       stop
     endif
 
-    ! 4. Percolation
-    Q_Per = max(0.0, min(Qp0 * S_wc0 * p_dt, W_c0(i,t,l)))
+    ! 4. Percolation safety checks
+    if (Qp0 .ne. Qp0 .or. abs(Qp0) .gt. 1.0e30) then
+      write(*,*) "FATAL: invalid Qp0 in land_stepvTrans"
+      write(*,*) "rank=", rank, " i=", i, " t=", t, " l=", l
+      write(*,*) "Qp0=", Qp0
+      stop
+    endif
+
+    if (S_wc0 .ne. S_wc0 .or. S_wc0 .lt. 0.0 .or. S_wc0 .gt. 1.0) then
+      write(*,*) "FATAL: invalid S_wc0 in land_stepvTrans"
+      write(*,*) "rank=", rank, " i=", i, " t=", t, " l=", l
+      write(*,*) "S_wc0=", S_wc0
+      write(*,*) "W_c0=", W_c0(i,t,l), " Wmax=", Wmax
+      stop
+    endif
+
+    if (W_c0(i,t,l) .ne. W_c0(i,t,l) .or. W_c0(i,t,l) .lt. 0.0) then
+      write(*,*) "FATAL: invalid W_c0 before percolation in land_stepvTrans"
+      write(*,*) "rank=", rank, " i=", i, " t=", t, " l=", l
+      write(*,*) "W_c0=", W_c0(i,t,l)
+      write(*,*) "Qin=", Qin(i,t,l), " Q_Oflow=", Q_Oflow
+      stop
+    endif
+
+    if (p_dt .ne. p_dt .or. p_dt .le. 0.0) then
+      write(*,*) "FATAL: invalid p_dt in land_stepvTrans"
+      write(*,*) "rank=", rank, " i=", i, " t=", t, " l=", l
+      write(*,*) "p_dt=", p_dt
+      stop
+    endif
+    write(*,*) "DEBUG BEFORE Q_Per rank=", rank, " i=", i, " t=", t, " l=", l
+    write(*,*) "Qin=", Qin(i,t,l)
+    write(*,*) "W_c0=", W_c0(i,t,l)
+    write(*,*) "Wmax=", Wmax
+    write(*,*) "S_wc0=", S_wc0
+    write(*,*) "Qp0=", Qp0
+    write(*,*) "p_dt=", p_dt
+    write(*,*) "Q_Oflow=", Q_Oflow
+    write(*,*) "Q_Oflow2=", Q_Oflow2
+    write(*,*) "fH2Ol_gwl=", fH2Ol_gwl
+    call flush(6)
+
+    Q_Per = Qp0
+    call flush(6)
+    Q_Per = Q_Per * S_wc0
+    call flush(6)
+    Q_Per = Q_Per * p_dt
+    call flush(6)
+
+    if (Q_Per .ne. Q_Per) then
+      write(*,*) "FATAL: Q_Per became NaN"
+      write(*,*) "rank=", rank, " i=", i, " t=", t, " l=", l
+      write(*,*) "Qp0=", Qp0, " S_wc0=", S_wc0, " p_dt=", p_dt
+      call flush(6)
+      stop
+    endif
+
+    Q_Per = max(0.0, min(Q_Per, W_c0(i,t,l)))
+
     W_c0(i,t,l) = W_c0(i,t,l) - Q_Per
     W_c0(i,t,l) = max(0.0, min(W_c0(i,t,l), Wmax))
 
