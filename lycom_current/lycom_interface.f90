@@ -449,15 +449,15 @@ if (writeout) then
   ah_Lai(h)                     = as_Lai + as_Lai * (1.0 - as_area_s)
   ah_rCb(h)                     = as_rCb + as_rCb * (1.0 - as_area_s)
 
-  !ah_fH2Ol_lsat(h)              =layer_con0*(1.0-as_area_s) + as_fH2Ol_lsat
+  !ah_fH2Ol_lsat(h)              =layer_con0*(1.0-as_area_s) + as_fH2Ol_lsat *as_area_s
   
-  ah_fH2Ol_runoff_l(h)          =Runoff_land*(1.0-as_area_s) + as_fH2Ol_runoff_l* as_area_s   
+  ah_fH2Ol_runoff_l(h)          =Runoff_land*(1.0-as_area_s) + as_fH2Ol_runoff_l * as_area_s  
   
   ah_fCc_gpp(h)                 = as_fCc_gpp
   
   ah_fCc_npp(h)                 = as_fCc_npp
 
-  ah_fH2Ol_bsat(h)              =bucket_con0*(1.0-as_area_s)+as_fH2Ol_bsat
+  !ah_fH2Ol_bsat(h)              =bucket_con0*(1.0-as_area_s)+as_fH2Ol_bsat * as_area_s
   ah_fCO2gc(h)                  = as_fCO2gc
   
   ah_fCcg(h)                    = as_fCcg
@@ -715,7 +715,7 @@ if (writeout) then
     !at_rmaxH2Ol(t,k)               = av_rmaxH2Ol(k) *ratioCG
 
     !at_fH2Ol_lsat(t,k)             = av_fH2Ol_lsat(k) *ratioCG
-    at_fH2Ol_bsat(t,k)             = av_fH2Ol_bsat(k) *ratioCG
+    !at_fH2Ol_bsat(t,k)             = av_fH2Ol_bsat(k) *ratioCG
     at_fH2Ol_runoff_l(t,k)         = av_fH2Ol_runoff_l(k)*ratioCG
     at_fCc_gpp(t,k)                = av_fCc_gpp(k)*ratioCG
     at_fCc_npp(t,k)                = av_fCc_npp(k)*ratioCG
@@ -853,7 +853,6 @@ if (writeout) then
     ag_fH2Ol_runoff_l(i,:) = 0.0
     ! etc.
   endif
-
 endif
 
 return

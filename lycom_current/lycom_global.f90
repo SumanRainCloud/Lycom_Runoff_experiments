@@ -946,8 +946,6 @@ counter=1
 !write(*,*) "Proc: in readHourG ",rank, " indv",size(indvec)
 !write(*,*)"indvec 1 ", indvec(:,1)
 !write(*,*)"indvec 2 ", indvec(:,2)
-
-
 do c = 1,7
   !write(*,*) "c is",c
   call check(nf90_inq_varID(ncID0(c), varName, varID))
@@ -977,21 +975,22 @@ do c = 1,7
 enddo
 
 ! When you open the rain NetCDF file:
-character(len=128) :: units_str
-integer :: varID_rain
+!character(len=128) :: units_str
+!integer :: varID_rain
 
 ! After opening the file and getting the variable ID:
-call check(nf90_inq_varid(ncID0(4), "rain", varID_rain))
+!call check(nf90_inq_varid(ncID0(4), "rain", varID_rain))
 
 ! Read the units attribute:
-call check(nf90_get_att(ncID0(4), varID_rain, "units", units_str))
+!call check(nf90_get_att(ncID0(4), varID_rain, "units", units_str))
 
 ! Print it:
-if (rank .eq. 0) then
-  write(*,*) "================================================================"
-  write(*,*) "CRITICAL: Rain units from NetCDF = '", trim(units_str), "'"
-  write(*,*) "================================================================"
-endif
+!if (rank .eq. 0) then
+!  write(*,*) "================================================================"
+!  write(*,*) "CRITICAL: Rain units from NetCDF = '", trim(units_str), "'"
+!  write(*,*) "================================================================"
+!endif
+
 !write(*,*) "reading for h is done"
 return
 end subroutine lycom_readHourG
@@ -1006,7 +1005,6 @@ use mpi
 implicit none
 
 integer :: mperr
-
 
 call MPI_BARRIER(MPI_COMM_WORLD, mperr)
 

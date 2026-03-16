@@ -37,7 +37,26 @@ implicit none
 
 integer :: i,t,v,h,j,m,l
 integer :: nCPts3
+!write (*,*) "LYcophyte_init: is starting"
+! initialise fields
+
+!klife(:,:,:)                = 0   !!check if it is required!!    !CHANGED coordinate               ! switch between dead and alive
+!rH2Ol_t(:,:,:,:,:)              = 0.0 !not required                                  ! thallus water content [m3 H2O / m2 T]
+!rH2Ol_b(:,:,:,:,:)              = 0.0                                   ! thallus water content [m3 H2O / m2 T]
+
+netgrowth(:,:,:)            = 0.0  !!Need to check!!             !CHANGED coordinate                             ! net growth [1 / ts]
+!!!!!!AREATH_S!!!!! is not req most likely
 area_s(:,:,:)             = 0.0  !!check if this is mandatory                                 ! surface cover [ m2 T / m2 V ]
+
+!gpp0(i,:,:)                 = 0.0                                   ! initial GPP
+!npp0(i,:,:)                 = 0.0                                   ! initial NPP
+
+
+!the random parameter is diff from lycom
+
+! initialise species parameters
+!write (*,*) "The total number of species is ", p_nspec
+!write (*,*) "The total number of speciesvariables is ", p_nspecpar
 
 do j = 1,p_nspec ! loop over all species
 
@@ -47,25 +66,69 @@ do j = 1,p_nspec ! loop over all species
 
   o_albedo2(j)                  = 0.0!vec_o(j,4)*(p_alb_h-p_alb_l)+p_alb_l  ! pure NVV albedo []       *NEW GLOBAL VARIABLE
                                                                         
+  !o_zt(j)                       = p_zt_l * exp(vec_o(j,2) &             ! thallus height (photosynthesising) [m]
+   !                             * log(p_zt_h / p_zt_l))                 
+
+  !o_prs(j)                      = vec_o(j,3) * (p_prs_h - p_prs_l) &    ! total thallus porosity when dry []
+    !                            + p_prs_l
+
+  !o_LAI(j)                      = (vec_o(j,2)*(p_LAInvv_h-p_LAInvv_l) & ! LAI of NVV []                                                         ! NEEDS EXP. VALIDATION I
+     !                           + p_LAInvv_l)
+
+  !o_rs(j)                       = (1.0-vec_o(j,3)) &                    ! thallus resistance to H2O [s / m]                                     ! NEEDS EXP. VALIDATION II
+      !                          * (p_rs_h - p_rs_l) + p_rs_l
+
+  !fracAir                       = vec_o(j,4) * (p_fracA_h -p_fracA_l) & ! fraction of air at saturation []                                              ! HOW TO DETERMINE IN LAB ?
+       !                         + p_fracA_l
 
   o_spec_area(j)                = vec_o(j,5)*(13-2)+2!(0.500-0.075)+0.075   ! specific area [m2 T / kg C]                                           ! NEEDS EXP. VALIDATION III
                                 
                                                                         
+  !o_theta_max(j)                = o_prs(j)*(1.0-fracAir)*o_zt(j) &      ! water storage capacity [kg H2O / kg C]                                ! NEEDS EXP. VALIDATION III
+         !                       * c_rhoH2Ol *o_spec_area(j) * 0.5 !calib
+
+  !o_sat_X(j)                    = vec_o(j,5)                            ! water saturation at which potential becomes negative []               ! NEEDS EXP. VALIDATION II
+
+  !o_sat_actF(j)                 = (1.0 -vec_o(j,5)) *(p_sat_actF_h &    ! water saturation needed for full activity []                          ! NEEDS EXP. VALIDATION IV
+  !                              - p_sat_actF_l) + p_sat_actF_l
+
+  !o_DCO2(j)                     = p_kCO2g_satl * exp(vec_o(j,4) &       ! DCO2 min [mol / (m2 T * s)]                                           ! NEEDS EXP. VALIDATION IV
+  !                              * log(p_kCO2g_sath / p_kCO2g_satl))     
+
+  !o_DCO2B(j)                    = vec_o(j,5) *(p_kCO2gB_h-p_kCO2gB_l) & ! DCO2 slope [ ]                                                        ! NEEDS EXP. VALIDATION IV
+  !                              + p_kCO2gB_l
+
+                                                                        
+  !o_satHph(j)                   = vec_o(j,9)*(p_satHph_h-p_satHph_l) &  ! saturation below which hydrophobicity occurs []
+          !                      + p_satHph_l
+! write (*,*) "Te total number of species is ", p_nspec 
+!  write (*,*) "The j is ", j
+!  write (*,*) "The random number is from libry_specpar", vec_o(j,8)                                                                      
   o_vcmax_M(j)                  = p_vcmaxM_l * exp(vec_o(j,8) &         ! carboxylation rate of Rubisco (molar vcmax) [1 / s] p_vcmaxM_l=0.0139,p_vcmaxM_h=26.8   *all global var even the limits 
                                 * log(p_vcmaxM_h / p_vcmaxM_l))         
                                                                         
   o_vomax_M(j)                  = vec_o(j,9) * (p_vomaxM_h &            ! oxygenation rate of Rubisco (molar vomax) [1 / s] p_vomaxM_l=0.391,p_vomaxM_h=2.5  *all global var even the limits
                                 - p_vomaxM_l) + p_vomaxM_l              
                                                                         
+  !o_resp_main(j)                = p_Rref_l * exp(vec_o(j,8) &           ! reference maintenance Respiration  [mol / (m2 T * s)] 
+   !                             * log(p_Rref_h / p_Rref_l)) &           
+    !                            / o_spec_area(j)
+
   o_RubConc(j)			=(Rub_h - Rub_l) * vec_o(j,10)+ Rub_l ! Rub_h=10e-6  Rub_l=8.5e-6                    *all global var even the limits
 
   o_ratio_Resp_Rub(j) 		= (resp_rub_h-resp_rub_l) * vec_o(j,12)+ resp_rub_l !resp_rub_h=0.1,resp_rub_l=0.01   *all global var even the limits
 
   o_gS0(j) 			= (gS0_h-gS0_l)*vec_o(j,2)+gS0_l !gS0_h=0.350,gS0_l=0.200                           *all global var even the limits
                                                                         
+  !!!!o_spec_Rubisco(j)             = o_RubConc(j) * o_ratio_Resp_Rub(j)                 ! specific Rubisco content [mol / m2 T]                                 ! NEEDS EXP. VALIDATION V
 
   o_resp_main(j)		= o_RubConc(j) * o_ratio_Resp_Rub(j)                 ! specific Rubisco content [mol / m2 T] *all global var even the limits     ! NEEDS EXP. VALIDATION V
                                                                         
+  !o_turnover(j)                 = p_turnover_l * exp(vec_o(j,8) &       ! turnover [1 / yr]                                                     ! NEEDS EXP. VALIDATION VI 
+
+
+
+
   o_X(j)=(0.99-0.9)*vec_o(j,7) + 0.9                                                                                 !*all global var even the limits
 
   o_G_area(j)=(((50-30)*vec_o(j,14)) + 30) / 10000                                                                     !*all global var even the limits
@@ -99,6 +162,9 @@ do j = 1,p_nspec ! loop over all species
 
 enddo
 do i = 1,nCPts3
+  !write (*,*) "The temp is", 
+  !write (*,*) "The rain is", fH2Ol_ad(i)
+  !write (*,*) ""
   do t = 1,p_ntiles
     !Wx(i,t)= 0.5 * por * 0.65
     !!xT_g0(i,t) = 288.0
@@ -228,8 +294,67 @@ kH2Og                           = max( p_vonKarman * p_vonKarman &      ! [m / s
                                   0.004 )
 
 
-rain=fH2Ol_ad(i)!*0.001 !(ESTONIA/SA/INDi)
+rain=fH2Ol_ad(i)*0.001 !(ESTONIA/SA/INDi)
+!counts = counts +1 
+!if (rain .gt. 0.0) then
+!write (*,*) "The time it is printing at", counts
+!write (*,*) "The rain is", fH2Ol_ad(i)
+!write (*,*) "The surface temp is", xT_a(i)
+!write (*,*) "The relative humidity is", rH2Og_RH(i)
+!write (*,*) "The wind is", fAIR_s(i)
+!write (*,*) "The snow is", fH2Os_ad(i)
+!write (*,*) "The short wave rads", fRADs_ad(i)
+!write (*,*) "The longwave is", fRADl_ad(i)
 
+!endif
+!COMMENTED fH2Ol_tb_f1 =fH2Ol_tbf1
+!commented !if (t .eq. 1) then  !forest
+
+  !write (*,*) "Forest tile"
+fracrain1(i,t)                 =2.0/p_LAImax
+  !write (*,*) "The frac Rain", fracrain1(i,t)
+  !write (*,*) "The Rain", rain*p_dt
+fH2Ol_ci1(i,t)                 =max(0.0, rain*fracrain1(i,t)*0.35 * p_dt)!mul 0.65        ! water input into canopy [m3 H2O / (m2 C * s)]     !!!!!! THIS CANOPY WATER--may be utilised for direct evaporation
+!write (*,*) "canopy water", fH2Ol_ci1(i,t)
+w_rain_canopy= rain* p_dt * (1.0 - fracrain1(i,t)*0.35) !Water not entrapped by canopy
+  !write (*,*) "The water required in the top soil is ", fH2Ol_tb_f1
+  !write (*,*) "The rain water after canopy interception ", w_rain_canopy
+!COMMENTED TOPSOILfH2Ol_ts1(i,t)    =max(0.0, min(w_rain_canopy, fH2Ol_tb_f1))  !!!0.0 !topsoilwater
+  
+  !write (*,*) "Top soil water", fH2Ol_ts1(i,t)
+
+fH2Ol_ux1(i,t)                  =max(0.0, w_rain_canopy) !- fH2Ol_ts1(i,t)) ! water input into soil as throughfall after the loss in the topsoil [ m3 H2O / m2 G / s ]
+!write (*,*) "water into ground", fH2Ol_ux1(i,t)
+!!tHIS SECTIONCOMMENTED_Topsoil_problem
+!if (fH2Ol_ts1(i,t) - p_rmaxH2Ol_g1 .le. 0.0) then 
+
+!  fH2Ol_tb_f1                =   0 !if filled
+!else
+      
+!  fH2Ol_tb_f1                =  p_rmaxH2Ol_g1 - fH2Ol_ts1(i,t)  !if not filled
+
+!endif                      
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!UPTO tHIS SECTION  
+ !commented section 
+!else
+!  !write (*,*) "Non forest tile"
+!  fH2Ol_ci1(i,t)                 =0
+!  !write (*,*) "canopy water", fH2Ol_ci1(i,t)
+!  fH2Ol_ts1(i,t)                 =0.0!commentedmax(0.0 ,min(rain*p_dt, fH2Ol_tb_f1))       !0.05*rain    water on top of the soil('may be 5% of the rainfall')      !!!!!! THIS Water on top of the soil--may be utilised for direct evaporation
+
+!  !write (*,*) "Top soil water", fH2Ol_ts1(i,t)
+!  fH2Ol_ux1(i,t)                 =max(0.0,rain*p_dt - fH2Ol_ts1(i,t))    !water into soil
+!  !write (*,*) "water into ground", fH2Ol_ux1(i,t)
+!  if (fH2Ol_ts1(i,t) - p_rmaxH2Ol_g1 .le. 0.0) then 
+!    fH2Ol_tb_f1                =0 !if filled
+!  else
+!      
+!    fH2Ol_tb_f1                = (p_rmaxH2Ol_g1-fH2Ol_ts1(i,t))  !if not filled
+!
+!  endif                      
+!  
+!  !fH2Ol_ux1                 =rain-fH2Ol_ts1     !water into soil   'This becomes a bit more complicated in case of bareground and snow or frozen ground'
+!endif
 
 
 
@@ -309,6 +434,53 @@ do j = 1,p_nspec
 
     gS = max(p_critD, min(gSleaf, gSleaf2))  
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!dsnow contraint is removed (commented)
+!    if (dsnow .ge. p_H2Os_crit) then             ! snow layer too thick                            
+!      ETpot                     = 0.0                                                                             !global
+!      fH2Olg_xu(j)              = 0.0  !evaporation from thallus not req                                          !global
+!      fH2Ol_bx(j)               = 0.0  !bark water uptake.. not req                                               !global
+!      fH2Osl_g                  = min(3.22 * max(0.0,xT_a(i)-c_TH2Osl)& ! snow melt [m/s]                                                       REF: Bergstrom,1992
+!                                / c_day / 1000.0, &
+!                                  rH2Os_g(i) / p_dt + fH2Os_ad(i)/1000)
+!
+!      rH2Os_g(i)                = max(0.0, rH2Os_g(i) &
+!                                + fH2Os_ad(i)/1000 * p_dt &
+!                                - fH2Osl_g * p_dt &
+!                                - rH2Os_g(i) * p_H2Os_loss*p_dt)
+!      fCO2gc_L(j)              = 0.0
+!      fCO2gc_W(j)              = 0.0
+!      wetfrac                  = 0.0
+!      dsnow                    = rH2Os_g(i) * c_rhoH2Ol / p_rhoH2Os    
+!      fH2Ol_bd(j)               = 0.0  !bark wter overflow                                                        !global
+!      fH2Ol_xd(j)               = fH2Ol_xd(j)+ 0.0   !runoff.......'what is this?--check out now'
+!      xT_s_dry                  = min(c_TH2Osl - 0.1, xT_a(i))                                                    !global
+!      xT_s(j)                   = xT_s_dry                                                                        !local
+!      fRAD_H(j)                 = 0.0
+!      fCbo(j)                   = 0.0                                                                            !local
+!      fQ_ta_L(j)                = 0.0                                                                             !local
+!      fQ_ta_S(j)                = 0.0
+!      Layer_con(j)              = sum(W_c1(i,t,j,:))/(Wmax*5)
+!      mon_cond(j)               = mon_cond(j) + Layer_con(j)
+!      counttimer(j)                =counttimer(j)+1
+!      S2(j)                     = max(0.0, Wx1(i,t,j) / Wxmax) 
+!      nfd(j)                    = nfd(j) + 1.0
+!      Rspec(j)                  = 0.0!o_resp_main(j) &                      ! [mol / (m2 T * s)]                                                    REF: Kruse,2010
+!                                      !      * o_Q10_resp(j) &
+!                                      !      **((xT_s(j) - o_ToptP(j)) / 10.0)
+!
+!      fCO2nc(j)                   = 0.0
+!      fCO2gc(j)                   =0.0
+!      npp0(j)       =npp0(j)+ fCO2nc(j)
+!      gpp0(j)=  fCO2gc(j)
+!      fH2Olg_ga(j)     = 0.0
+!      fCcb(j)          =  0.0 !Same question 
+!      fQ_tg(j)                    = 0.0!kSOIL(i) * (xT_s(j) )& ! Ground heat flux [W / m2 T]
+!                                !/ p_dz_SOIL * lground
+!
+!      xT_g(i,t,j)               = xT_g(i,t,j) +0.0!&
+!                                !+ fQ_tg(j) /CSOIL(i) /p_dz_SOIL *p_dt 
+!!!!!More stuffs need to be added here                                                                         !local
+!    else
     !write(*,*) "The part when snow is less than critical" 
     
     grh		 = gamma2 / kH2Og  
@@ -386,7 +558,10 @@ do j = 1,p_nspec
         W_c1(i,t,j,l) = W_c1(i,t,j,l) - QR1(i,t,j,l)
 
         S_wc1(j,l) = max(0.0, min(1.0, W_c1(i,t,j,l) / Wmax))
-        if (QRpot .lt. 0.0) then
+          
+
+          
+       if (QRpot .lt. 0.0) then
           
           QRpot=0.0;
         else
@@ -435,7 +610,6 @@ do j = 1,p_nspec
 
       Q_base1(i,t,j) = min(Qb0 * S2(j)* p_dt, Wx1(i,t,j) )  
       Wx1(i,t,j) = Wx1(i,t,j) - Q_base1(i,t,j)
-      
       Runoff1(i,t,j)= Q_base1(i,t,j) + Overflow !!
 
       fH2Ol_xd(j)=fH2Ol_xd(j)+max(0.0,Runoff1(i,t,j))
@@ -488,7 +662,7 @@ do j = 1,p_nspec
 
         if (l .eq. 1) then
 
-          Qin1(i,t,j,l) = rain*(3600)-((2.0/p_LAImax)*(35/100)*rain*3600 + fH2Osl_g * 3600)!!check if the coordinate system is right
+          Qin1(i,t,j,l) = rain*(p_dt)-((2.0/p_LAImax)*(35/100)*rain*3600 + fH2Osl_g * 3600)!!check if the coordinate system is right
         
         else
         
@@ -551,12 +725,13 @@ do j = 1,p_nspec
       Q_base1(i,t,j) = min(Qb0 * S2(j) * p_dt, Wx1(i,t,j))
       Wx1(i,t,j) = Wx1(i,t,j) - Q_base1(i,t,j)
 
-      if (S2(j) .gt. 1.0) then
-        write(*,*) "The Soil saturation level(bucket) is more than 1 at", i
-      endif
 
-      ! Total runoff from this species
-      Runoff1(i,t,j) = Q_base1(i,t,j) + Overflow  
+     if (S2(j) .gt. 1.0) then
+        write(*,*) "The Soil saturation level(bucket) is more than 1 at", i
+      endif       
+       
+      Runoff1(i,t,j)=Q_base1(i,t,j) + Overflow !!THis needs to declared universally available
+        
       fH2Ol_xd(j)=fH2Ol_xd(j)+max(0.0,Runoff1(i,t,j)) 
         
         
@@ -1193,7 +1368,7 @@ do j = 1,p_nspec
   ! Check if lichen is alive
   if (day .eq. dpm .and. ts .eq. tspd) then
     
-   
+    Run_tot(i,t,j) = 0.0 
     fH2Ol_xd(j)=0.0
     npp0(i,j)=0.0
     gpp0(i,j)=0.0

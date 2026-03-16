@@ -5,8 +5,6 @@ module lycom_par
 ! run control
 !***********************************************************************
 integer, parameter :: dp = selected_real_kind(15, 307)
-
-
 integer                 :: year                                         ! year in simulation
 integer                 :: month                                        ! month in year
 integer                 :: dpm                                          ! days per month
@@ -265,8 +263,8 @@ real, parameter         :: p_kH2Ol_sb           = 3.0e-8                ! soil-g
 real, parameter         :: por                  = 0.45
 real, parameter         :: Wmax                 = 0.45*0.03
 real, parameter         :: Wxmax                = 0.45*0.65
-real, parameter         :: Qp0                  = 0.5e-6!
-real, parameter         :: Qb0                  = 1.0e-7!
+real, parameter         :: Qp0                  = 0.5e-6!7
+real, parameter         :: Qb0                  = 1.0e-7!8
 
 ! Surface properties
 

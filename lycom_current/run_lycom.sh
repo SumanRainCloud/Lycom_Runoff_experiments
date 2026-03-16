@@ -6,8 +6,8 @@
 #
 # name of binary
 #
-vname="25Jan_100species_30year_veg_current" #t3fO  #_21"  #"H6C6sp"
-expname="25Jan_100species_30year_veg_current" #-n8c36
+vname="8Feb_2_100species_30year_veg_current" #t3fO  #_21"  #"H6C6sp"
+expname="8Feb_2_100species_30year_veg_current" #-n8c36
 #
 model="lycom_${vname}.x"
 #

@@ -5,19 +5,13 @@ use lycom_opt
 
 implicit none
 
-! ═══════════════════════════════════════════════════════════════
-! Module-level variables shared between subroutines
-! CRITICAL: These MUST be here, not inside subroutines
-! ═══════════════════════════════════════════════════════════════
 contains
-
 
 subroutine first_land()
 use lycom_par
 use lycom_opt
 
 implicit none
-
 
 integer :: i,i2,j,m,t,x,y
 integer :: nCPts3             !!number of sites 
@@ -183,12 +177,12 @@ rH2Ol_g2(:,:)                   = 0.0                                   ! water 
 !!!!!Watch out for the variable below too
 do i = 1, nCPts3
   do t = 1, p_ntiles
+    
     Wx(i,t)    = 0.5 * por * 0.65
     if (Wx(i,t) .le. 0.0 .or. Wx(i,t) .ne. Wx(i,t)) then
-      write(*,*) "WARNING: Invalid Wx at rank=", rank, " i=", i, " t=", t
-      Wx(i,t) = 0.15  ! Fallback value
-    endif
-
+      write(*,*) "Warning!Invalid Wx" 
+      Wx(i,t) = 0.15 
+    endif 
     xT_g0(i,t) = 288.0
 
     do l = 1,nsoil
@@ -196,7 +190,7 @@ do i = 1, nCPts3
       if (W_c0(i,t,l) .le. 0.0 .or. W_c0(i,t,l) .ne. W_c0(i,t,l)) then
         write(*,*) "WARNING: Invalid W_c0 at rank=", rank, " i=", i, " t=", t, " l=", l
         W_c0(i,t,l) = 0.015  ! Fallback value
-      endif
+      endif 
     enddo
   enddo
 enddo
@@ -215,6 +209,7 @@ Q_Oflow_b2 = 0.0
 fH2Ol_gwl  = 0.0
 fH2Ol_xd_land = 0.0
 Runoff_land   = 0.0
+
 Ta3 = 0.0
 Ta4 = 0.0
 zT_a = 0.0
@@ -313,7 +308,7 @@ desatdT                         = exp(p_esatAIR1*zT_a/(p_esatAIR2 + zT_a)) * (p_
 
 ! Snow balance
 
-fH2Osl_g                        = min(3.22 * max(0.0,xT_a(i)-c_TH2Osl)/ c_day / 1000.0,rH2Os_g(i) / p_dt) ! snow melt [m/s]                                                       REF: Bergstrom,1992
+fH2Osl_g                        = min(3.22 * max(0.0,xT_a(i)-c_TH2Osl)/ c_day / 1000.0,rH2Os_g(i) / p_dt ) ! snow melt [m/s]                                                       REF: Bergstrom,1992
                                  
                                   
 
@@ -340,12 +335,20 @@ implicit none
 integer :: i,t,v,m,n,o
 real :: fracRADs_0
 ! initial ground temperature
-real    :: rain
+real    :: rain, rain_m,rain_ms
 fH2Ol_ci(i,t) = 0.0
 fH2Ol_ux(i,t) = 0.0
 fH2Ol_ts(i,t) = 0.0
 ! Switches
-
+if (i .le. 3 .and. ts .le. 3) then
+  write(*,*) "=== RAIN DIAGNOSTIC i=", i, " ts=", ts, " ==="
+  write(*,*) "Raw fH2Ol_ad(i) =", fH2Ol_ad(i)
+  write(*,*) "Scientific notation:", fH2Ol_ad(i)
+  write(*,*) "If this is ~1E-6: units are probably [m/s] ✓"
+  write(*,*) "If this is ~0.001-0.01: units are probably [kg/m²/s] or [mm/s]"
+  write(*,*) "If this is ~1-10: units are probably [mm/hr]"
+  write(*,*) "========================================"
+endif
 if (v .eq. 2) then ! canopy
   lground                       = 0.0  !at canopy(not req for my case)
 else
@@ -391,10 +394,10 @@ fH2Ol_tb_f   =fH2Ol_tbf  !!!!needs to be initialisedglobal variable!!!!!!!!!!!
 !water fluxes
 
 !the if statement is changed sine there is no need to have two part such as canopy and ground separately
-
-rain_ms =fH2Ol_ad(i)/1000 !1.5E-06 !fH2Ol_ad(i)!*0.001 !(ESTONIA/SA/IND)
+rain_ms =fH2Ol_ad(i) !1.5E-06 !fH2Ol_ad(i)!*0.001 !(ESTONIA/SA/IND)
 rain_m = rain_ms * p_dt
 rain = rain_ms 
+
 !write (*,*) "LYCOMLAND prints here"
 !if (rain .gt. 0.0) then
 !  write (*,*) "rain from Lycom land", rain, "for timestep", i 
@@ -404,7 +407,10 @@ if (t .eq. 1) then  !forest
   
   fracrain(i,t)                 = 2.0/p_LAImax
 
-  fH2Ol_ci(i,t)                 = max(0.0,rain_m*fracrain(i,t)*0.35)
+  !fH2Ol_ci(i,t)                 = max(0.0,rain*fracrain(i,t)/max(1.0,Acano(i,t))*0.35 *p_dt)!mul 0.65        ! water input into canopy [m3 H2O / (m2 C * s)]     !!!!!! THIS CANOPY WATER--may be utilised for direct evaporation
+
+
+  fH2Ol_ci(i,t)                 = max(0.0,rain_m*fracrain(i,t)*0.35 )
   fH2Ol_ts(i,t)                =  max(0.0,min(rain_m -fH2Ol_ci(i,t),fH2Ol_tb_f))!!!0.0 
   
   
@@ -423,7 +429,7 @@ if (t .eq. 1) then  !forest
 else
   
   fH2Ol_ci(i,t)                 =0
-  fH2Ol_ts(i,t)                 =min(rain_m,fH2Ol_tb_f)!!!0.0!commented       !0.05*rain    water on top of the soil('may be 5% of the rainfall')      !!!!!! THIS Water on top of the soil--may be utilised for direct evaporation
+  fH2Ol_ts(i,t)                 =min(rain_m ,fH2Ol_tb_f)!!!0.0!commented       !0.05*rain    water on top of the soil('may be 5% of the rainfall')      !!!!!! THIS Water on top of the soil--may be utilised for direct evaporation
 
 
   fH2Ol_ux(i,t)                 =max(0.0, rain_m - fH2Ol_ts(i,t))    !water into soil
@@ -432,11 +438,11 @@ else
     fH2Ol_tb_f                =0.0 !if filled
   else
       
-    fH2Ol_tb_f = max(0.0, p_rmaxH2Ol_g1 - fH2Ol_ts(i,t))
+    fH2Ol_tb_f                = max(0.0, p_rmaxH2Ol_g1 - fH2Ol_ts(i,t))  !if not filled
 
   endif                      
   
-  fH2Ol_ux(i,t)                 = max(0.0, rain_m - fH2Ol_ts(i,t))  !commented   !water into soil   'This becomes a bit more complicated in case of bareground and snow or frozen ground'
+  fH2Ol_ux(i,t) = max(0.0, rain_m - fH2Ol_ts(i,t))  !'This becomes a bit more complicated in case of bareground and snow or frozen ground'
 endif
 
 
@@ -487,7 +493,10 @@ real    :: grh0, cdg0, xT_s_wet0, xT_s_dry0, crh0
 real    :: wetfrac_0
 real    :: dRAD, fRAD_Hw0, fRAD_Hd0, ETpot0
 real    :: ETpot_v, soilevap, Evap
-
+fH2Ol_xd0 = 0.0
+fH2Ol_gwl = 0.0
+fH2Olg_xu0 = 0.0
+fH2Ol_go = 0.0
 
 !debug
 !real    :: wso1, wso2
@@ -595,6 +604,8 @@ if (t .le. 2) then !only forest and grassland
       fH2Ol_go              =0.0
 
 
+
+
       fH2Ol_gwl    =max(0.0, (fH2Ol_ux(i,t) + fH2Ol_xd0)) !new variable
       
       
@@ -663,9 +674,9 @@ real    :: percolation, rootuptk, trans, Lay_upt
 
 ! soil water balance
 Lay_upt = 0.0
-Q_Per = 0.0      ! ← ADD THIS
-Q_Oflow = 0.0    ! ← ADD THIS
-Q_Oflow2 = 0.0   ! ← ADD THIS
+Q_Per = 0.0      
+Q_Oflow = 0.0    
+Q_Oflow2 = 0.0   
 Q_Oflow_b = 0.0  
 Q_Oflow_b2 = 0.0
 if (xT_s0 .lt. c_TH2Osl) then ! inactivity below zero degrees
@@ -705,7 +716,7 @@ else
     write(*,*) "rain=", fH2Ol_ad(i)
     stop
   endif
-  
+
   if (fH2Ol_gwl .gt. 1.0) then  ! Check for unreasonable value
     write(*,*) "WARNING: Huge fH2Ol_gwl=", fH2Ol_gwl, " at i=", i, " t=", t
     write(*,*) "This is ", fH2Ol_gwl*1000, " mm of water!"
@@ -714,11 +725,11 @@ else
     write(*,*) "Limiting to 0.1 m"
     fH2Ol_gwl = 0.1  ! Cap at 100 mm
   endif
-
   ! Upper soil layer
   do l = 1, nsoil
     
     if (l .eq. 1) then
+
       Qin(i,t,l) = max( 0.0, fH2Ol_gwl )
     else
       Qin(i,t,l) = Q_Per + Q_Oflow + Q_Oflow2
@@ -726,12 +737,34 @@ else
     
     W_c0(i,t,l) = W_c0(i,t,l) + Qin(i,t,l)
     Q_Oflow = max(0.0, W_c0(i,t,l) - Wmax)
-    
+    if (Q_Oflow .ne. Q_Oflow) then  ! Check for NaN
+      write(*,*) "FATAL ERROR: Q_Oflow is NaN"
+      write(*,*) "i=", i, " t=", t, " l=", l
+      write(*,*) "W_c0(i,t,l)=", W_c0(i,t,l)
+      write(*,*) "Qin(i,t,l)=", Qin(i,t,l)
+      write(*,*) "Wmax=", Wmax
+      stop
+    endif
     W_c0(i,t,l) = W_c0(i,t,l) - Q_Oflow
     S_wc0 = max(0.0, min(1.0, W_c0(i,t,l) / Wmax))
-    
+    if (W_c0(i,t,l) /= W_c0(i,t,l) .or. W_c0(i,t,l) < -1.0e-12 .or. W_c0(i,t,l) > 1.0) then
+      write(*,*) "BAD W_c0 at rank=",rank," i=",i," t=",t," l=",l
+      write(*,*) "W_c0=",W_c0(i,t,l)," Qin=",Qin(i,t,l)," Wmax=",Wmax," p_dt=",p_dt
+      write(*,*) "rain=",fH2Ol_ad(i)," fH2Ol_ts=",fH2Ol_ts(i,t)," fH2Ol_ux=",fH2Ol_ux(i,t)
+      !call MPI_ABORT(MPI_COMM_WORLD, 999, mperr)
+    endif
     Q_per = max(0.0, min(Qp0 * S_wc0 * p_dt, W_c0(i,t,l)))
-    
+    if (Q_per .ne. Q_per) then  ! Check for NaN
+
+      write(*,*) "FATAL ERROR: Q_per is NaN at LINE 675"
+      write(*,*) "i=", i, " t=", t, " l=", l
+      write(*,*) "Qp0=", Qp0
+      write(*,*) "S_wc0=", S_wc0
+      write(*,*) "p_dt=", p_dt
+      write(*,*) "W_c0(i,t,l)=", W_c0(i,t,l)
+      write(*,*) "Wmax=", Wmax
+      stop
+    endif
     W_c0(i,t,l) = W_c0(i,t,l) - Q_per
     
     Q_Oflow2 = max(0.0, W_c0(i,t,l) - Wmax)
