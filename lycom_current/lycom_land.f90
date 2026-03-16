@@ -565,7 +565,7 @@ if (t .le. 2) then !only forest and grassland
                                 - 4.0*p_eps*c_sigma*Ta3*xT_s_dry0 * (2.0-lground) &
                                 - kSOIL(i) *(xT_s_dry0 - xT_g0(i,t)) /p_dz_SOIL * lground
 
-    if (xT_s_dry0 .lt. c_TH2Osl) then ! frozen surface
+    if (xT_s_dry0 .lt. c_TH2Osl-5) then ! frozen surface
 
       fRAD_Hw0                  = 0.0
       ETpot0                    = 0.0
@@ -669,7 +669,7 @@ implicit none
 integer :: i,t,v,h,j,m,l
 real    :: ETpot_v, Rnet, Evap
 real    :: percolation, rootuptk, trans, Lay_upt
-
+real, parameter :: wlim = 1.0e-4
 ! soil water balance
 Lay_upt   = 0.0
 Q_Per     = 0.0
@@ -711,6 +711,7 @@ if (xT_s0 .lt. c_TH2Osl-5) then
   Runoff(i,t) = fH2Ol_gb
   Wx(i,t) = Wx(i,t) - Runoff(i,t)
   Wx(i,t) = max(0.0, min(Wx(i,t), Wxmax))
+  if (Wx(i,t) .lt. wlim) Wx(i,t) = 0.0
 
   fH2Ol_xd_land = Runoff(i,t)
   Runoff_land   = fH2Ol_xd_land
@@ -721,16 +722,9 @@ if (xT_s0 .lt. c_TH2Osl-5) then
 ! Unfrozen case
 ! ------------------------------------------------------------------
 else
-  write(*,*) "DEBUG ENTER UNFROZEN rank=", rank, " i=", i, " t=", t
-  write(*,*) "Ta4=", Ta4, " desatdT=", desatdT, " c_gamma=", c_gamma
-  write(*,*) "Wx=", Wx(i,t), " Wxmax=", Wxmax
-  write(*,*) "p_dt=", p_dt, " p_rmaxH2Ol_g2=", p_rmaxH2Ol_g2
-  call flush(6)
   Rnet    = fRADs_ad(i)*0.85 + p_eps*fRADl_ad(i) - p_eps*c_sigma*Ta4
   ETpot_v = 1.4 * Rnet * desatdT / (desatdT + c_gamma) / c_HH2Olg / c_rhoH2Ol
   ETpot_v = max(0.0, ETpot_v)
-  write(*,*) "DEBUG AFTER ETpot_v rank=", rank, " i=", i, " t=", t, " ETpot_v=", ETpot_v
-  call flush(6)
   if (Wx(i,t) .gt. p_critD) then
     if (p_rmaxH2Ol_g2 .le. p_critD .or. p_rmaxH2Ol_g2 .ne. p_rmaxH2Ol_g2) then
       write(*,*) "FATAL: invalid p_rmaxH2Ol_g2"
@@ -781,11 +775,13 @@ else
     ! 1. Add incoming water
     W_c0(i,t,l) = W_c0(i,t,l) + Qin(i,t,l)
     W_c0(i,t,l) = max(0.0, W_c0(i,t,l))
+    if (W_c0(i,t,l) .lt. wlim) W_c0(i,t,l) = 0.0
 
     ! 2. Primary overflow
     Q_Oflow = max(0.0, W_c0(i,t,l) - Wmax)
     W_c0(i,t,l) = W_c0(i,t,l) - Q_Oflow
     W_c0(i,t,l) = max(0.0, min(W_c0(i,t,l), Wmax))
+    if (W_c0(i,t,l) .lt. wlim) W_c0(i,t,l) = 0.0
 
     ! 3. Saturation
     if (W_c0(i,t,l) .ne. W_c0(i,t,l)) then
@@ -795,8 +791,13 @@ else
       stop
     endif
 
-    S_wc0 = W_c0(i,t,l) / Wmax
-    S_wc0 = max(0.0, min(1.0, S_wc0))
+    if (W_c0(i,t,l) .lt. wlim) then
+      W_c0(i,t,l) = 0.0
+      S_wc0 = 0.0
+    else
+      S_wc0 = W_c0(i,t,l) / Wmax
+      S_wc0 = max(0.0, min(1.0, S_wc0))
+    endif
 
     if (S_wc0 .ne. S_wc0) then
       write(*,*) "FATAL: S_wc0 is NaN in land_stepvTrans"
@@ -835,51 +836,32 @@ else
       write(*,*) "p_dt=", p_dt
       stop
     endif
-    write(*,*) "DEBUG BEFORE Q_Per rank=", rank, " i=", i, " t=", t, " l=", l
-    write(*,*) "Qin=", Qin(i,t,l)
-    write(*,*) "W_c0=", W_c0(i,t,l)
-    write(*,*) "Wmax=", Wmax
-    write(*,*) "S_wc0=", S_wc0
-    write(*,*) "Qp0=", Qp0
-    write(*,*) "p_dt=", p_dt
-    write(*,*) "Q_Oflow=", Q_Oflow
-    write(*,*) "Q_Oflow2=", Q_Oflow2
-    write(*,*) "fH2Ol_gwl=", fH2Ol_gwl
-    call flush(6)
-
-    Q_Per = Qp0
-    call flush(6)
-    Q_Per = Q_Per * S_wc0
-    call flush(6)
-    Q_Per = Q_Per * p_dt
-    call flush(6)
-
-    if (Q_Per .ne. Q_Per) then
-      write(*,*) "FATAL: Q_Per became NaN"
-      write(*,*) "rank=", rank, " i=", i, " t=", t, " l=", l
-      write(*,*) "Qp0=", Qp0, " S_wc0=", S_wc0, " p_dt=", p_dt
-      call flush(6)
-      stop
+    if (W_c0(i,t,l) .lt. wlim .or. S_wc0 .lt. wlim) then
+      Q_Per = 0.0
+    else
+      Q_Per = Qp0 * S_wc0 * p_dt
+      Q_Per = max(0.0, min(Q_Per, W_c0(i,t,l)))
     endif
-
-    Q_Per = max(0.0, min(Q_Per, W_c0(i,t,l)))
 
     W_c0(i,t,l) = W_c0(i,t,l) - Q_Per
     W_c0(i,t,l) = max(0.0, min(W_c0(i,t,l), Wmax))
+    if (W_c0(i,t,l) .lt. wlim) W_c0(i,t,l) = 0.0
 
     ! 5. Secondary overflow safeguard
     Q_Oflow2 = max(0.0, W_c0(i,t,l) - Wmax)
     W_c0(i,t,l) = W_c0(i,t,l) - Q_Oflow2
     W_c0(i,t,l) = max(0.0, min(W_c0(i,t,l), Wmax))
+    if (W_c0(i,t,l) .lt. wlim) W_c0(i,t,l) = 0.0
 
     ! 6. Root uptake
     QR(i,t,l) = min(max(0.0, trans), W_c0(i,t,l))
     W_c0(i,t,l) = W_c0(i,t,l) - QR(i,t,l)
     W_c0(i,t,l) = max(0.0, min(W_c0(i,t,l), Wmax))
+    if (W_c0(i,t,l) .lt. wlim) W_c0(i,t,l) = 0.0
 
     Lay_upt = Lay_upt + QR(i,t,l)
+    if (W_c0(i,t,l) .lt. wlim) W_c0(i,t,l) = 0.0
     W_con_ll = W_con_ll + W_c0(i,t,l) / Wmax
-
     trans = max(0.0, trans - QR(i,t,l))
 
   enddo
@@ -892,14 +874,17 @@ else
   ! ---------------------------------------------------------------
   Wx(i,t) = Wx(i,t) + Q_Oflow + Q_Per + Q_Oflow2
   Wx(i,t) = max(0.0, Wx(i,t))
+  if (Wx(i,t) .lt. wlim) Wx(i,t) = 0.0
 
   Q_Oflow_b = max(0.0, Wx(i,t) - Wxmax)
   Wx(i,t)   = Wx(i,t) - Q_Oflow_b
   Wx(i,t)   = max(0.0, min(Wx(i,t), Wxmax))
+  if (Wx(i,t) .lt. wlim) Wx(i,t) = 0.0
 
   Evap    = min(Wx(i,t), max(0.0, trans))
   Wx(i,t) = Wx(i,t) - Evap
   Wx(i,t) = max(0.0, min(Wx(i,t), Wxmax))
+  if (Wx(i,t) .lt. wlim) Wx(i,t) = 0.0
 
   S_2 = Wx(i,t) / Wxmax
   S_2 = max(0.0, min(1.0, S_2))
@@ -907,10 +892,12 @@ else
   Q_Oflow_b2 = max(0.0, Wx(i,t) - Wxmax)
   Wx(i,t)    = Wx(i,t) - Q_Oflow_b2
   Wx(i,t)    = max(0.0, min(Wx(i,t), Wxmax))
+  if (Wx(i,t) .lt. wlim) Wx(i,t) = 0.0
 
   Q_base(i,t) = max(0.0, min(Qb0 * S_2 * p_dt, Wx(i,t)))
   Wx(i,t)     = Wx(i,t) - Q_base(i,t)
   Wx(i,t)     = max(0.0, min(Wx(i,t), Wxmax))
+  if (Wx(i,t) .lt. wlim) Wx(i,t) = 0.0
 
   fH2Olg_ga1   = fH2Olg_ga_1 + Lay_upt + Evap
   Runoff(i,t)  = Q_base(i,t) + Q_Oflow_b + Q_Oflow_b2

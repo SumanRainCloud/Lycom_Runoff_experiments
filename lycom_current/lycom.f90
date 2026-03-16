@@ -272,6 +272,7 @@ real    :: Rnet
 real    :: a, b, d, xl, Al, Al_r, Ac, Ac_r, K
 real    :: hmon
 real    :: QRpot
+real, parameter  :: wlim = 1.0e-4
 kcccc=0
 simhour = lastyear*365*24 
 ETact=0.0
@@ -474,6 +475,7 @@ do j = 1,p_nspec
 
       do l = 1, nsoil
         Qin1(i,t,j,l) = 0.0
+        if (W_c1(i,t,j,l) .lt. wlim) W_c1(i,t,j,l) = 0.0
         S_wc1(j,l) = max(0.0, min(1.0, W_c1(i,t,j,l) / Wmax))
         nfd(j) = nfd(j) + 1.0
         if (S_wc1(j,l) .lt. 0.01) MD0(j) = MD0(j) + 1
@@ -503,7 +505,6 @@ do j = 1,p_nspec
       Runoff1(i,t,j) = Q_base1(i,t,j) + max(0.0, fH2Ol_ux1(i,t))
       fH2Ol_xd(j) = fH2Ol_xd(j) + max(0.0, Runoff1(i,t,j))
 
-      fH2Ol_xd(j)=fH2Ol_xd(j)+max(0.0,Runoff1(i,t,j))
       if (S2(j) .gt. 1.0) then
         write(*,*) "The Soil saturation level(bucket) is more than 1 at", i
       endif       
@@ -557,13 +558,18 @@ do j = 1,p_nspec
 
         W_c1(i,t,j,l) = W_c1(i,t,j,l) + Qin1(i,t,j,l)
         W_c1(i,t,j,l) = max(0.0, W_c1(i,t,j,l))
-
+        if (W_c1(i,t,j,l) .lt. wlim) W_c1(i,t,j,l) = 0.0
         Q_Oflow1 = max(0.0, W_c1(i,t,j,l) - Wmax)
         W_c1(i,t,j,l) = W_c1(i,t,j,l) - Q_Oflow1
         W_c1(i,t,j,l) = max(0.0, min(W_c1(i,t,j,l), Wmax))
 
-        S_wc1(j,l) = W_c1(i,t,j,l) / Wmax
-        S_wc1(j,l) = max(0.0, min(1.0, S_wc1(j,l)))
+        if (W_c1(i,t,j,l) .lt. wlim) then
+          W_c1(i,t,j,l) = 0.0
+          S_wc1(j,l) = 0.0
+        else
+          S_wc1(j,l) = W_c1(i,t,j,l) / Wmax
+          S_wc1(j,l) = max(0.0, min(1.0, S_wc1(j,l)))
+        endif
 
         if (S_wc1(j,l) .ne. S_wc1(j,l)) then
           write(*,*) "FATAL: S_wc1 is NaN in unfrozen nova_step"
@@ -572,7 +578,12 @@ do j = 1,p_nspec
           stop
         endif
 
-        Q_Per1 = max(0.0, min(Qp0 * S_wc1(j,l) * p_dt, W_c1(i,t,j,l)))
+        if (W_c1(i,t,j,l) .lt. wlim .or. S_wc1(j,l) .lt. wlim) then
+          Q_Per1 = 0.0
+        else
+          Q_Per1 = Qp0 * S_wc1(j,l) * p_dt
+          Q_Per1 = max(0.0, min(Q_Per1, W_c1(i,t,j,l)))
+        endif
         W_c1(i,t,j,l) = W_c1(i,t,j,l) - Q_Per1
         W_c1(i,t,j,l) = max(0.0, min(W_c1(i,t,j,l), Wmax))
 
@@ -600,28 +611,18 @@ do j = 1,p_nspec
 
       counttimer(j)=counttimer(j)+1
       
-!      Rnet_v                        = fRADs_ad(i)*0.85 +p_eps*fRADl_ad(i) &
-                                !- p_eps*c_sigma*Ta4
-               
-!      ETpot_v                     = 1.4 *Rnet_v*desatdT/(desatdT+c_gamma) & ! [m3 H2O / (m2 G * s)]
-                                !/ c_HH2Olg/c_rhoH2Ol
-
-!      soilevap                   =min(fH2Ol_ts1(i,t), (max(0.0,ETpot_v) * p_dt)) !Evaporation from topsoil
-
-!COMMENTED        fH2Ol_ts1(i,t)=fH2Ol_ts1(i,t)-soilevap
-
-!COMMENTED        fH2Ol_tb_f1 = p_rmaxH2Ol_g1-fH2Ol_ts1(i,t)
       Wx1(i,t,j) = Wx1(i,t,j) + (Q_Per1 + Q_Oflow1)
+      if (Wx1(i,t,j) .lt. wlim) Wx1(i,t,j) = 0.0
       Overflow = max(0.0, Wx1(i,t,j) - Wxmax)
       Wx1(i,t,j) = Wx1(i,t,j) - Overflow
-
+      if (Wx1(i,t,j) .lt. wlim) Wx1(i,t,j) = 0.0
       S2(j) = max(0.0, min(1.0, Wx1(i,t,j) / Wxmax))
 
       Q_base1(i,t,j) = min(Qb0 * S2(j) * p_dt, Wx1(i,t,j))
       Wx1(i,t,j) = Wx1(i,t,j) - Q_base1(i,t,j)
+      if (Wx1(i,t,j) .lt. wlim) Wx1(i,t,j) = 0.0
 
-
-     if (S2(j) .gt. 1.0) then
+      if (S2(j) .gt. 1.0) then
         write(*,*) "The Soil saturation level(bucket) is more than 1 at", i
       endif       
        
@@ -634,7 +635,11 @@ do j = 1,p_nspec
     !write(*,*) "Wet_temp is", xT_s_wet
     !write(*,*) "dry_temp is", xT_s_dry
      
-    xT_s(j)                   = max(1.0, wetfrac * xT_s_wet + (1.0- wetfrac)*xT_s_dry)
+    if (xT_s_dry .le. c_TH2Osl-5.0) then
+      xT_s(j) = xT_s_dry
+    else
+      xT_s(j) = max(1.0, wetfrac * xT_s_wet + (1.0 - wetfrac) * xT_s_dry)
+    endif
     !write (*,*) 'xT_s is',xT_s(j)
     !write (*,*) 'wetfrac    ', wetfrac
     !write (*,*) "fRAD_Hd IS", fRAD_Hd
