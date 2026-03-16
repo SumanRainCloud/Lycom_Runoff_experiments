@@ -417,7 +417,7 @@ if (t .eq. 1) then  !forest
 
   fH2Ol_ux(i,t)                  = max(0.0,rain_m - fH2Ol_ci(i,t) - fH2Ol_ts(i,t)) ! water input into soil as throughfall after the loss in the topsoil [ m3 H2O / m2 G / s ]
 
-  if (fH2Ol_ts(i,t)-p_rmaxH2Ol_g1 .eq. 0.0) then 
+  if (fH2Ol_ts(i,t) .ge. p_rmaxH2Ol_g1 - p_critD) then
     fH2Ol_tb_f                =0.0 !if filled
   else
       
@@ -434,13 +434,11 @@ else
 
   fH2Ol_ux(i,t)                 =max(0.0, rain_m - fH2Ol_ts(i,t))    !water into soil
 
-  if (fH2Ol_ts(i,t) -p_rmaxH2Ol_g1 .le. 0.0) then 
-    fH2Ol_tb_f                =0.0 !if filled
+  if (fH2Ol_ts(i,t) .ge. p_rmaxH2Ol_g1 - p_critD) then
+    fH2Ol_tb_f = 0.0
   else
-      
-    fH2Ol_tb_f                = max(0.0, p_rmaxH2Ol_g1 - fH2Ol_ts(i,t))  !if not filled
-
-  endif                      
+    fH2Ol_tb_f = max(0.0, p_rmaxH2Ol_g1 - fH2Ol_ts(i,t))
+  endif                   
   
   fH2Ol_ux(i,t) = max(0.0, rain_m - fH2Ol_ts(i,t))  !'This becomes a bit more complicated in case of bareground and snow or frozen ground'
 endif
@@ -673,170 +671,188 @@ real    :: ETpot_v, Rnet, Evap
 real    :: percolation, rootuptk, trans, Lay_upt
 
 ! soil water balance
-Lay_upt = 0.0
-Q_Per = 0.0      
-Q_Oflow = 0.0    
-Q_Oflow2 = 0.0   
-Q_Oflow_b = 0.0  
-Q_Oflow_b2 = 0.0
-if (xT_s0 .lt. c_TH2Osl) then ! inactivity below zero degrees
+Lay_upt   = 0.0
+Q_Per     = 0.0
+Q_Oflow   = 0.0
+Q_Oflow2  = 0.0
+Q_Oflow_b = 0.0
+Q_Oflow_b2= 0.0
 
-  fH2Ol_gb = max(p_critD, min(Qb0 * S_2 * p_dt, Wx(i,t)))
-  
+! ------------------------------------------------------------------
+! Global safety checks
+! ------------------------------------------------------------------
+if (Wmax .le. p_critD .or. Wmax .ne. Wmax) then
+  write(*,*) "FATAL: invalid Wmax in land_stepvTrans"
+  write(*,*) "rank=", rank, " i=", i, " t=", t, " Wmax=", Wmax
+  stop
+endif
+
+if (Wxmax .le. p_critD .or. Wxmax .ne. Wxmax) then
+  write(*,*) "FATAL: invalid Wxmax in land_stepvTrans"
+  write(*,*) "rank=", rank, " i=", i, " t=", t, " Wxmax=", Wxmax
+  stop
+endif
+
+if (Qp0 .ne. Qp0 .or. Qb0 .ne. Qb0 .or. p_dt .le. 0.0 .or. p_dt .ne. p_dt) then
+  write(*,*) "FATAL: invalid hydraulic/time parameter"
+  write(*,*) "rank=", rank, " i=", i, " t=", t
+  write(*,*) "Qp0=", Qp0, " Qb0=", Qb0, " p_dt=", p_dt
+  stop
+endif
+
+! ------------------------------------------------------------------
+! Frozen case
+! ------------------------------------------------------------------
+if (xT_s0 .lt. c_TH2Osl) then
+
+  S_2 = max(0.0, min(1.0, S_2))
+
+  fH2Ol_gb = max(0.0, min(Qb0 * S_2 * p_dt, Wx(i,t)))
   Runoff(i,t) = fH2Ol_gb
   Wx(i,t) = Wx(i,t) - Runoff(i,t)
-  
+  Wx(i,t) = max(0.0, min(Wx(i,t), Wxmax))
+
   fH2Ol_xd_land = Runoff(i,t)
-  Runoff_land = fH2Ol_xd_land
-  
-  ! FIX: Add safety check
-  if (Wxmax .gt. p_critD) then
-    bucket_con0 = Wx(i,t) / Wxmax
-  else
-    bucket_con0 = 0.0
-  endif
-  
+  Runoff_land   = fH2Ol_xd_land
+
+  bucket_con0 = Wx(i,t) / Wxmax
+
+! ------------------------------------------------------------------
+! Unfrozen case
+! ------------------------------------------------------------------
 else
-  
-  Rnet = fRADs_ad(i)*0.85 + p_eps*fRADl_ad(i) - p_eps*c_sigma*Ta4
-  
+
+  Rnet    = fRADs_ad(i)*0.85 + p_eps*fRADl_ad(i) - p_eps*c_sigma*Ta4
   ETpot_v = 1.4 * Rnet * desatdT / (desatdT + c_gamma) / c_HH2Olg / c_rhoH2Ol
-  
+  ETpot_v = max(0.0, ETpot_v)
+
   if (Wx(i,t) .gt. p_critD) then
-    rootuptk = min( Wx(i,t)/ p_dt, p_kH2Ol_sv * (Wx(i,t)/p_rmaxH2Ol_g2)**2 )
+    if (p_rmaxH2Ol_g2 .le. p_critD .or. p_rmaxH2Ol_g2 .ne. p_rmaxH2Ol_g2) then
+      write(*,*) "FATAL: invalid p_rmaxH2Ol_g2"
+      write(*,*) "rank=", rank, " i=", i, " t=", t, " p_rmaxH2Ol_g2=", p_rmaxH2Ol_g2
+      stop
+    endif
+
+    rootuptk = min(Wx(i,t)/p_dt, p_kH2Ol_sv * (Wx(i,t)/p_rmaxH2Ol_g2)**2)
+    rootuptk = max(0.0, rootuptk)
   else
     rootuptk = 0.0
   endif
-  
-  trans = min( max(0.0, ETpot_v), rootuptk ) * p_dt
-  if (fH2Ol_gwl .ne. fH2Ol_gwl) then  ! Check for NaN
-    write(*,*) "ERROR: fH2Ol_gwl is NaN at i=", i, " t=", t
+
+  trans = min(ETpot_v, rootuptk) * p_dt
+  trans = max(0.0, trans)
+
+  if (fH2Ol_gwl .ne. fH2Ol_gwl) then
+    write(*,*) "FATAL: fH2Ol_gwl is NaN in land_stepvTrans"
+    write(*,*) "rank=", rank, " i=", i, " t=", t
     write(*,*) "fH2Ol_ux(i,t)=", fH2Ol_ux(i,t)
     write(*,*) "fH2Ol_xd0=", fH2Ol_xd0
-    write(*,*) "rain=", fH2Ol_ad(i)
+    write(*,*) "fH2Ol_ad(i)=", fH2Ol_ad(i)
     stop
   endif
 
-  if (fH2Ol_gwl .gt. 1.0) then  ! Check for unreasonable value
-    write(*,*) "WARNING: Huge fH2Ol_gwl=", fH2Ol_gwl, " at i=", i, " t=", t
-    write(*,*) "This is ", fH2Ol_gwl*1000, " mm of water!"
-    write(*,*) "fH2Ol_ux(i,t)=", fH2Ol_ux(i,t)
-    write(*,*) "fH2Ol_xd0=", fH2Ol_xd0
-    write(*,*) "Limiting to 0.1 m"
-    fH2Ol_gwl = 0.1  ! Cap at 100 mm
-  endif
-  ! Upper soil layer
+  fH2Ol_gwl = max(0.0, fH2Ol_gwl)
+
+  ! ---------------------------------------------------------------
+  ! Layered soil bucket
+  ! ---------------------------------------------------------------
   do l = 1, nsoil
-    
+
     if (l .eq. 1) then
-
-      Qin(i,t,l) = max( 0.0, fH2Ol_gwl )
+      Qin(i,t,l) = max(0.0, fH2Ol_gwl)
     else
-      Qin(i,t,l) = Q_Per + Q_Oflow + Q_Oflow2
+      Qin(i,t,l) = max(0.0, Q_Per + Q_Oflow + Q_Oflow2)
     endif
-    
+
+    if (Qin(i,t,l) .ne. Qin(i,t,l)) then
+      write(*,*) "FATAL: Qin is NaN in land_stepvTrans"
+      write(*,*) "rank=", rank, " i=", i, " t=", t, " l=", l
+      stop
+    endif
+
+    ! 1. Add incoming water
     W_c0(i,t,l) = W_c0(i,t,l) + Qin(i,t,l)
+    W_c0(i,t,l) = max(0.0, W_c0(i,t,l))
+
+    ! 2. Primary overflow
     Q_Oflow = max(0.0, W_c0(i,t,l) - Wmax)
-    if (Q_Oflow .ne. Q_Oflow) then  ! Check for NaN
-      write(*,*) "FATAL ERROR: Q_Oflow is NaN"
-      write(*,*) "i=", i, " t=", t, " l=", l
-      write(*,*) "W_c0(i,t,l)=", W_c0(i,t,l)
-      write(*,*) "Qin(i,t,l)=", Qin(i,t,l)
-      write(*,*) "Wmax=", Wmax
-      stop
-    endif
     W_c0(i,t,l) = W_c0(i,t,l) - Q_Oflow
-    S_wc0 = max(0.0, min(1.0, W_c0(i,t,l) / Wmax))
-    if (W_c0(i,t,l) /= W_c0(i,t,l) .or. W_c0(i,t,l) < -1.0e-12 .or. W_c0(i,t,l) > 1.0) then
-      write(*,*) "BAD W_c0 at rank=",rank," i=",i," t=",t," l=",l
-      write(*,*) "W_c0=",W_c0(i,t,l)," Qin=",Qin(i,t,l)," Wmax=",Wmax," p_dt=",p_dt
-      write(*,*) "rain=",fH2Ol_ad(i)," fH2Ol_ts=",fH2Ol_ts(i,t)," fH2Ol_ux=",fH2Ol_ux(i,t)
-      !call MPI_ABORT(MPI_COMM_WORLD, 999, mperr)
-    endif
-    Q_per = max(0.0, min(Qp0 * S_wc0 * p_dt, W_c0(i,t,l)))
-    if (Q_per .ne. Q_per) then  ! Check for NaN
+    W_c0(i,t,l) = max(0.0, min(W_c0(i,t,l), Wmax))
 
-      write(*,*) "FATAL ERROR: Q_per is NaN at LINE 675"
-      write(*,*) "i=", i, " t=", t, " l=", l
-      write(*,*) "Qp0=", Qp0
-      write(*,*) "S_wc0=", S_wc0
-      write(*,*) "p_dt=", p_dt
-      write(*,*) "W_c0(i,t,l)=", W_c0(i,t,l)
-      write(*,*) "Wmax=", Wmax
+    ! 3. Saturation
+    S_wc0 = W_c0(i,t,l) / Wmax
+    S_wc0 = max(0.0, min(1.0, S_wc0))
+
+    if (S_wc0 .ne. S_wc0) then
+      write(*,*) "FATAL: S_wc0 is NaN in land_stepvTrans"
+      write(*,*) "rank=", rank, " i=", i, " t=", t, " l=", l
+      write(*,*) "W_c0=", W_c0(i,t,l), " Wmax=", Wmax
       stop
     endif
-    W_c0(i,t,l) = W_c0(i,t,l) - Q_per
-    
-    Q_Oflow2 = max(0.0, W_c0(i,t,l) - Wmax)
-    
-    W_c0(i,t,l) = W_c0(i,t,l) - Q_Oflow2
-    
-    QR(i,t,l) = min(trans, W_c0(i,t,l))
-    
-    W_c0(i,t,l) = W_c0(i,t,l) - QR(i,t,l)
-    
-    Lay_upt = Lay_upt + QR(i,t,l)
-    
-    ! FIX: Add safety check
-    if (Wmax .gt. p_critD) then
-      W_con_ll = W_con_ll + W_c0(i,t,l) / Wmax
-    endif
-    
-    if (trans .lt. 0.0) then
-      trans = 0.0
-    else
-      trans = trans - QR(i,t,l)
-    endif
-    
-  enddo
-  
-  layer_con0 = max(0.0, min(1.0, W_con_ll / 5))
-  
-  W_con_ll = 0.0
-  
-  ! bulk soil below
-  Wx(i,t) = Wx(i,t) + Q_Oflow + Q_per + Q_Oflow2
-  Q_Oflow_b = max(0.0, Wx(i,t) - Wxmax)
-  Wx(i,t) = Wx(i,t) - Q_Oflow_b
-  
-  Evap = min(Wx(i,t), max(0.0, trans))
-  
-  Wx(i,t) = Wx(i,t) - Evap
-  
-  S_2 = max(0.0, min(1.0, Wx(i,t) / Wxmax))
-  
-  Q_Oflow_b2 = max(0.0, Wx(i,t) - Wxmax)
-  
-  Wx(i,t) = Wx(i,t) - Q_Oflow_b2
-  
-  Q_base(i,t) = min(Qb0 * S_2 * p_dt, Wx(i,t))
-  
-  Wx(i,t) = Wx(i,t) - Q_base(i,t)
-  
-  fH2Olg_ga1 = fH2Olg_ga_1 + Lay_upt + Evap
-  
-  Lay_upt = 0.0
-  
-  Runoff(i,t) = Q_base(i,t) + Q_Oflow_b + Q_Oflow_b2
-  
-  fH2Ol_xd_land = Runoff(i,t)
-  
-  Runoff_land = fH2Ol_xd_land
-  
-  ! FIX: Add safety check
-  if (Wxmax .gt. p_critD) then
-    bucket_con0 = Wx(i,t) / Wxmax
-  else
-    bucket_con0 = 0.0
-  endif
-  
-endif ! surface not frozen
 
+    ! 4. Percolation
+    Q_Per = max(0.0, min(Qp0 * S_wc0 * p_dt, W_c0(i,t,l)))
+    W_c0(i,t,l) = W_c0(i,t,l) - Q_Per
+    W_c0(i,t,l) = max(0.0, min(W_c0(i,t,l), Wmax))
+
+    ! 5. Secondary overflow safeguard
+    Q_Oflow2 = max(0.0, W_c0(i,t,l) - Wmax)
+    W_c0(i,t,l) = W_c0(i,t,l) - Q_Oflow2
+    W_c0(i,t,l) = max(0.0, min(W_c0(i,t,l), Wmax))
+
+    ! 6. Root uptake
+    QR(i,t,l) = min(max(0.0, trans), W_c0(i,t,l))
+    W_c0(i,t,l) = W_c0(i,t,l) - QR(i,t,l)
+    W_c0(i,t,l) = max(0.0, min(W_c0(i,t,l), Wmax))
+
+    Lay_upt = Lay_upt + QR(i,t,l)
+    W_con_ll = W_con_ll + W_c0(i,t,l) / Wmax
+
+    trans = max(0.0, trans - QR(i,t,l))
+
+  enddo
+
+  layer_con0 = max(0.0, min(1.0, W_con_ll / real(nsoil)))
+  W_con_ll   = 0.0
+
+  ! ---------------------------------------------------------------
+  ! Bulk soil bucket
+  ! ---------------------------------------------------------------
+  Wx(i,t) = Wx(i,t) + Q_Oflow + Q_Per + Q_Oflow2
+  Wx(i,t) = max(0.0, Wx(i,t))
+
+  Q_Oflow_b = max(0.0, Wx(i,t) - Wxmax)
+  Wx(i,t)   = Wx(i,t) - Q_Oflow_b
+  Wx(i,t)   = max(0.0, min(Wx(i,t), Wxmax))
+
+  Evap    = min(Wx(i,t), max(0.0, trans))
+  Wx(i,t) = Wx(i,t) - Evap
+  Wx(i,t) = max(0.0, min(Wx(i,t), Wxmax))
+
+  S_2 = Wx(i,t) / Wxmax
+  S_2 = max(0.0, min(1.0, S_2))
+
+  Q_Oflow_b2 = max(0.0, Wx(i,t) - Wxmax)
+  Wx(i,t)    = Wx(i,t) - Q_Oflow_b2
+  Wx(i,t)    = max(0.0, min(Wx(i,t), Wxmax))
+
+  Q_base(i,t) = max(0.0, min(Qb0 * S_2 * p_dt, Wx(i,t)))
+  Wx(i,t)     = Wx(i,t) - Q_base(i,t)
+  Wx(i,t)     = max(0.0, min(Wx(i,t), Wxmax))
+
+  fH2Olg_ga1   = fH2Olg_ga_1 + Lay_upt + Evap
+  Runoff(i,t)  = Q_base(i,t) + Q_Oflow_b + Q_Oflow_b2
+  fH2Ol_xd_land = Runoff(i,t)
+  Runoff_land   = fH2Ol_xd_land
+  bucket_con0   = Wx(i,t) / Wxmax
+
+endif ! frozen / unfrozen
+
+! ------------------------------------------------------------------
 ! Ground heat
+! ------------------------------------------------------------------
 fQ_tg0 = kSOIL(i) * (xT_s0 - xT_g0(i,t)) / p_dz_SOIL * lground
 
-! Heat balance
-! FIX: Add safety check
 if (CSOIL(i) .gt. p_critD .and. p_dz_SOIL .gt. p_critD) then
   xT_g0(i,t) = xT_g0(i,t) + fQ_tg0 / CSOIL(i) / p_dz_SOIL * p_dt
 endif

@@ -272,6 +272,10 @@ real    :: Rnet
 real    :: a, b, d, xl, Al, Al_r, Ac, Ac_r, K
 real    :: hmon
 real    :: QRpot
+write(*,*) "Wmax=", Wmax
+write(*,*) "Qp0=", Qp0
+stop
+
 kcccc=0
 simhour = lastyear*365*24 
 ETact=0.0
@@ -294,9 +298,19 @@ kH2Og                           = max( p_vonKarman * p_vonKarman &      ! [m / s
                                   0.004 )
 
 
-rain=fH2Ol_ad(i) !(ESTONIA/SA/INDi)
+rain=fH2Ol_ad(i)!(ESTONIA/SA/INDi)
+!counts = counts +1 
+!if (rain .gt. 0.0) then
+!write (*,*) "The time it is printing at", counts
+!write (*,*) "The rain is", fH2Ol_ad(i)
+!write (*,*) "The surface temp is", xT_a(i)
+!write (*,*) "The relative humidity is", rH2Og_RH(i)
+!write (*,*) "The wind is", fAIR_s(i)
+!write (*,*) "The snow is", fH2Os_ad(i)
+!write (*,*) "The short wave rads", fRADs_ad(i)
+!write (*,*) "The longwave is", fRADl_ad(i)
 
-
+!endif
 !COMMENTED fH2Ol_tb_f1 =fH2Ol_tbf1
 !commented !if (t .eq. 1) then  !forest
 
@@ -314,27 +328,40 @@ w_rain_canopy= rain* p_dt * (1.0 - fracrain1(i,t)*0.35) !Water not entrapped by 
   !write (*,*) "Top soil water", fH2Ol_ts1(i,t)
 
 fH2Ol_ux1(i,t)                  =max(0.0, w_rain_canopy) !- fH2Ol_ts1(i,t)) ! water input into soil as throughfall after the loss in the topsoil [ m3 H2O / m2 G / s ]
+!write (*,*) "water into ground", fH2Ol_ux1(i,t)
+!!tHIS SECTIONCOMMENTED_Topsoil_problem
+!if (fH2Ol_ts1(i,t) - p_rmaxH2Ol_g1 .le. 0.0) then 
+
+!  fH2Ol_tb_f1                =   0 !if filled
+!else
+      
+!  fH2Ol_tb_f1                =  p_rmaxH2Ol_g1 - fH2Ol_ts1(i,t)  !if not filled
+
+!endif                      
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!UPTO tHIS SECTION  
+ !commented section 
+!else
+!  !write (*,*) "Non forest tile"
+!  fH2Ol_ci1(i,t)                 =0
+!  !write (*,*) "canopy water", fH2Ol_ci1(i,t)
+!  fH2Ol_ts1(i,t)                 =0.0!commentedmax(0.0 ,min(rain*p_dt, fH2Ol_tb_f1))       !0.05*rain    water on top of the soil('may be 5% of the rainfall')      !!!!!! THIS Water on top of the soil--may be utilised for direct evaporation
+
+!  !write (*,*) "Top soil water", fH2Ol_ts1(i,t)
+!  fH2Ol_ux1(i,t)                 =max(0.0,rain*p_dt - fH2Ol_ts1(i,t))    !water into soil
+!  !write (*,*) "water into ground", fH2Ol_ux1(i,t)
+!  if (fH2Ol_ts1(i,t) - p_rmaxH2Ol_g1 .le. 0.0) then 
+!    fH2Ol_tb_f1                =0 !if filled
+!  else
+!      
+!    fH2Ol_tb_f1                = (p_rmaxH2Ol_g1-fH2Ol_ts1(i,t))  !if not filled
+!
+!  endif                      
+!  
+!  !fH2Ol_ux1                 =rain-fH2Ol_ts1     !water into soil   'This becomes a bit more complicated in case of bareground and snow or frozen ground'
+!endif
 
 
 
-if (Wmax .le. p_critD .or. Wmax .ne. Wmax) then
-  write(*,*) "FATAL: invalid Wmax in nova_step"
-  write(*,*) "rank=", rank, " i=", i, " t=", t, " Wmax=", Wmax
-  stop
-endif
-
-if (Wxmax .le. p_critD .or. Wxmax .ne. Wxmax) then
-  write(*,*) "FATAL: invalid Wxmax in nova_step"
-  write(*,*) "rank=", rank, " i=", i, " t=", t, " Wxmax=", Wxmax
-  stop
-endif
-
-if (Qp0 .ne. Qp0 .or. Qb0 .ne. Qb0 .or. p_dt .le. 0.0 .or. p_dt .ne. p_dt) then
-  write(*,*) "FATAL: invalid hydraulic/time parameter in nova_step"
-  write(*,*) "rank=", rank, " i=", i, " t=", t
-  write(*,*) "Qp0=", Qp0, " Qb0=", Qb0, " p_dt=", p_dt
-  stop
-endif
 
 !-----------------------------------------------------------------------
 ! Start loop over all species in a grid cell - I -
@@ -414,7 +441,50 @@ do j = 1,p_nspec
     gS = max(p_critD, min(gSleaf, gSleaf2))  
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!dsnow contraint is removed (commented)
-
+!    if (dsnow .ge. p_H2Os_crit) then             ! snow layer too thick                            
+!      ETpot                     = 0.0                                                                             !global
+!      fH2Olg_xu(j)              = 0.0  !evaporation from thallus not req                                          !global
+!      fH2Ol_bx(j)               = 0.0  !bark water uptake.. not req                                               !global
+!      fH2Osl_g                  = min(3.22 * max(0.0,xT_a(i)-c_TH2Osl)& ! snow melt [m/s]                                                       REF: Bergstrom,1992
+!                                / c_day / 1000.0, &
+!                                  rH2Os_g(i) / p_dt + fH2Os_ad(i)/1000)
+!
+!      rH2Os_g(i)                = max(0.0, rH2Os_g(i) &
+!                                + fH2Os_ad(i)/1000 * p_dt &
+!                                - fH2Osl_g * p_dt &
+!                                - rH2Os_g(i) * p_H2Os_loss*p_dt)
+!      fCO2gc_L(j)              = 0.0
+!      fCO2gc_W(j)              = 0.0
+!      wetfrac                  = 0.0
+!      dsnow                    = rH2Os_g(i) * c_rhoH2Ol / p_rhoH2Os    
+!      fH2Ol_bd(j)               = 0.0  !bark wter overflow                                                        !global
+!      fH2Ol_xd(j)               = fH2Ol_xd(j)+ 0.0   !runoff.......'what is this?--check out now'
+!      xT_s_dry                  = min(c_TH2Osl - 0.1, xT_a(i))                                                    !global
+!      xT_s(j)                   = xT_s_dry                                                                        !local
+!      fRAD_H(j)                 = 0.0
+!      fCbo(j)                   = 0.0                                                                            !local
+!      fQ_ta_L(j)                = 0.0                                                                             !local
+!      fQ_ta_S(j)                = 0.0
+!      Layer_con(j)              = sum(W_c1(i,t,j,:))/(Wmax*5)
+!      mon_cond(j)               = mon_cond(j) + Layer_con(j)
+!      counttimer(j)                =counttimer(j)+1
+!      S2(j)                     = max(0.0, Wx1(i,t,j) / Wxmax) 
+!      nfd(j)                    = nfd(j) + 1.0
+!      Rspec(j)                  = 0.0!o_resp_main(j) &                      ! [mol / (m2 T * s)]                                                    REF: Kruse,2010
+!                                      !      * o_Q10_resp(j) &
+!                                      !      **((xT_s(j) - o_ToptP(j)) / 10.0)
+!
+!      fCO2nc(j)                   = 0.0
+!      fCO2gc(j)                   =0.0
+!      npp0(j)       =npp0(j)+ fCO2nc(j)
+!      gpp0(j)=  fCO2gc(j)
+!      fH2Olg_ga(j)     = 0.0
+!      fCcb(j)          =  0.0 !Same question 
+!      fQ_tg(j)                    = 0.0!kSOIL(i) * (xT_s(j) )& ! Ground heat flux [W / m2 T]
+!                                !/ p_dz_SOIL * lground
+!
+!      xT_g(i,t,j)               = xT_g(i,t,j) +0.0!&
+!                                !+ fQ_tg(j) /CSOIL(i) /p_dz_SOIL *p_dt 
 !!!!!More stuffs need to be added here                                                                         !local
 !    else
     !write(*,*) "The part when snow is less than critical" 
@@ -451,6 +521,7 @@ do j = 1,p_nspec
       wetfrac                 = 0.0
       fH2Ol_xd(j)             =fH2Ol_xd(j) +0.0
       xT_s(j)                 = xT_s_dry        
+
       !fH2Osl_g	     = 0.0                                                                                        !*global
 
       !rH2Os_g(i)           = max(0.0, rH2Os_g(i) + fH2Os_ad(i)/1000 * p_dt- fH2Osl_g * p_dt - rH2Os_g(i) * p_H2Os_loss * p_dt )  ! %snow layer [m3 H2O / m2 G] *global
@@ -467,41 +538,102 @@ do j = 1,p_nspec
 
       fCcg_M(j) = Rspec(j) !NEW UNCOMMENTED
 
-      ! Frozen ground: no infiltration, no percolation, no root uptake
-      QRpot   = 0.0
-      Q_Per1  = 0.0
-      Q_Oflow1 = 0.0
+      QRpot = ETpot
+      !fH2Ol_ux1_frozen = 0.0
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!AADDEEDD please check
+      do l =1,nsoil
 
-      do l = 1, nsoil
-        Qin1(i,t,j,l) = 0.0
+        if (l .eq. 1) then
+
+          Qin1(i,t,j,l) = 0.0!rain*(p_dt)-((2.0/p_LAImax)*(35/100)*rain*3600) !!check if the coordinate system is right
+        
+        else
+        
+          Qin1(i,t,j,l)= Q_Per1 + Q_Oflow1
+        
+        endif
+        W_c1(i,t,j,l) = W_c1(i,t,j,l) + Qin1(i,t,j,l)
+          
+        Q_Oflow1 = max(0.0, W_c1(i,t,j,l) - Wmax)
+        W_c1(i,t,j,l) = W_c1(i,t,j,l) - Q_Oflow1
+
+        S_wc1(j,l) = max(0.0, min(1.0, W_c1(i,t,j,l) / Wmax))                            !!! Check if W designation is right and must have 0.5 as initial value !!Layer relative water content
+        if (Qp0 .ne. Qp0 .or. abs(Qp0) .gt. 1.0e30) then
+
+	  write(*,*) "FATAL: Qp0 invalid =", Qp0, " i=",i," t=",t," j=",j," l=",l
+	  stop
+	endif
+	if (W_c1(i,t,j,l) .ne. W_c1(i,t,j,l) .or. W_c1(i,t,j,l) .lt. 0.0) then
+  	  write(*,*) "FATAL: W_c1 invalid =", W_c1(i,t,j,l), " i=",i," t=",t," j=",j," l=",l
+          write(*,*) "Qin1=", Qin1(i,t,j,l), " Q_Oflow1=", Q_Oflow1
+          write(*,*) "S_wc1=", S_wc1(j,l), " Wmax=", Wmax
+          stop
+        endif
+        if (S_wc1(j,l) .ne. S_wc1(j,l) .or. S_wc1(j,l) .lt. 0.0 .or. S_wc1(j,l) .gt. 1.0) then
+          write(*,*) "FATAL: S_wc1 invalid =", S_wc1(j,l), " i=",i," t=",t," j=",j," l=",l
+          write(*,*) "W_c1=", W_c1(i,t,j,l), " Wmax=", Wmax
+          stop
+        endif 
+        Q_Per1 = min(Qp0 * S_wc1(j,l) * p_dt, W_c1(i,t,j,l))
+        W_c1(i,t,j,l) = W_c1(i,t,j,l) - Q_Per1
+
+        QR1(i,t,j,l) = min(QRpot * Br(i,j,l)/sum(Br(i,j,:)), W_c1(i,t,j,l))
+        W_c1(i,t,j,l) = W_c1(i,t,j,l) - QR1(i,t,j,l)
+
         S_wc1(j,l) = max(0.0, min(1.0, W_c1(i,t,j,l) / Wmax))
-        nfd(j) = nfd(j) + 1.0
-        if (S_wc1(j,l) .lt. 0.01) MD0(j) = MD0(j) + 1
+          
+
+          
+       if (QRpot .lt. 0.0) then
+          
+          QRpot=0.0;
+        else
+          
+          QRpot= QRpot - QR1(i,t,j,l)
+          
+        endif    
+        
+        nfd(j) = nfd(j) + 1.0 !NEW UNCOMMENTED
+          
+        if (S_wc1(j,l) .lt. 0.01) MD0(j) = MD0(j)+1
+        if (S_wc1(j,l) .gt. 1.0) then
+        endif       
+        
+ 
+        
       enddo
+        !nfd(j)= nfd(j) +1.0 !NEW COMMENTED
+      Layer_con(j)=  sum(S_wc1(j,:))/(5)
+      mon_cond(i,j)=mon_cond(i,j) + Layer_con(j)
+      counttimer(j)=counttimer(j)+1
+      !write (*,*) "Layer saturation water content", Layer_con(j) 
+      
+      
+      
+      Rnet_v                = fRADs_ad(i)*0.85 +p_eps*fRADl_ad(i) &
+                                - p_eps*c_sigma*Ta4
+               
+      !Bulk soil (bucket)
+      S2(j) = max(0.0,min(1.0, Wx1(i,t,j) / Wxmax))
+      
+      if (ETpot .le. 0.0) then
 
-      Layer_con(j)   = sum(S_wc1(j,:)) / real(nsoil)
-      mon_cond(i,j)  = mon_cond(i,j) + Layer_con(j)
-      counttimer(j)  = counttimer(j) + 1
+        wetfrac             = 1.0
+      else
+        wetfrac             =  ETact / ETpot/3600  
+          
+      endif
+      Wx1(i,t,j) = Wx1(i,t,j) + (Q_Oflow1 + Q_Per1)
 
-      ! Bulk bucket gets no recharge from frozen surface
-      Wx1(i,t,j) = max(0.0, min(Wx1(i,t,j), Wxmax))
+      Overflow = max(0.0, Wx1(i,t,j) - Wxmax)
+      Wx1(i,t,j) = Wx1(i,t,j) - Overflow
 
       S2(j) = max(0.0, min(1.0, Wx1(i,t,j) / Wxmax))
 
-      if (ETpot .le. 0.0) then
-        wetfrac = 1.0
-      else
-        wetfrac = ETact / ETpot / 3600.0
-      endif
 
-      Q_base1(i,t,j) = max(0.0, min(Qb0 * S2(j) * p_dt, Wx1(i,t,j)))
+      Q_base1(i,t,j) = min(Qb0 * S2(j)* p_dt, Wx1(i,t,j) )  
       Wx1(i,t,j) = Wx1(i,t,j) - Q_base1(i,t,j)
-      Wx1(i,t,j) = max(0.0, min(Wx1(i,t,j), Wxmax))
-
-      ! All throughfall runs off immediately because soil is frozen
-      Overflow = 0.0
-      Runoff1(i,t,j) = Q_base1(i,t,j) + max(0.0, fH2Ol_ux1(i,t))
-      fH2Ol_xd(j) = fH2Ol_xd(j) + max(0.0, Runoff1(i,t,j))
+      Runoff1(i,t,j)= Q_base1(i,t,j) + Overflow + fH2Ol_ux1(i,t)!!
 
       fH2Ol_xd(j)=fH2Ol_xd(j)+max(0.0,Runoff1(i,t,j))
       if (S2(j) .gt. 1.0) then
@@ -527,8 +659,16 @@ do j = 1,p_nspec
       fH2Ol_bx(j)             = 0.0
       fH2Ol_bd(j)             = 0.0
         
+      !fH2Osl_g                  = min(3.22 * max(0.0,xT_a(i)-c_TH2Osl)& ! snow melt [m/s]                                                       REF: Bergstrom,1992
+      !                          / c_day / 1000.0, &
+      !                            rH2Os_g(i) / p_dt + fH2Os_ad(i))
+        !write (*,*) 'wetfrac', wetfrac
+      !rH2Os_g(i)                      = max(0.0, rH2Os_g(i) &
+      !                          + fH2Os_ad(i) * p_dt &
+      !                          - fH2Osl_g * p_dt )
 
 
+      !dsnow                           = rH2Os_g(i) * c_rhoH2Ol / p_rhoH2Os
         
       fRAD_Hw = dRAD - 4.0*p_eps*c_sigma*Ta3*xT_s_wet -kSOIL(i) *(xT_s_wet - xT_g(i,t,j)) /p_dz_SOIL      !!CHEK HERE!!wet tem is used here but in lycom uses dry temp
       
@@ -539,61 +679,52 @@ do j = 1,p_nspec
 ! water uptake from below
       if (ETpot .le. 0.0) ETpot = 0.0
       
-      QRpot = max(0.0, ETpot * p_dt)
+      QRpot = ETpot * p_dt
 
       do l = 1, nsoil
 
         if (l .eq. 1) then
-          Qin1(i,t,j,l) = max(0.0, fH2Ol_ux1(i,t) + fH2Osl_g * p_dt)
+          Qin1(i,t,j,l) = fH2Ol_ux1(i,t) + fH2Osl_g * p_dt
         else
-          Qin1(i,t,j,l) = max(0.0, Q_Per1 + Q_Oflow1)
+          Qin1(i,t,j,l) = Q_Per1 + Q_Oflow1
         endif
 
-        if (Qin1(i,t,j,l) .ne. Qin1(i,t,j,l)) then
-          write(*,*) "FATAL: Qin1 is NaN in unfrozen nova_step"
-          write(*,*) "rank=", rank, " i=", i, " t=", t, " j=", j, " l=", l
-          stop
-        endif
-
+        ! Step 1: add input to layer first
         W_c1(i,t,j,l) = W_c1(i,t,j,l) + Qin1(i,t,j,l)
-        W_c1(i,t,j,l) = max(0.0, W_c1(i,t,j,l))
 
+        ! Step 2: cap overflow from updated water content
         Q_Oflow1 = max(0.0, W_c1(i,t,j,l) - Wmax)
         W_c1(i,t,j,l) = W_c1(i,t,j,l) - Q_Oflow1
-        W_c1(i,t,j,l) = max(0.0, min(W_c1(i,t,j,l), Wmax))
 
-        S_wc1(j,l) = W_c1(i,t,j,l) / Wmax
-        S_wc1(j,l) = max(0.0, min(1.0, S_wc1(j,l)))
+        ! Step 3: saturation from updated water content
+        S_wc1(j,l) = max(0.0, min(1.0, W_c1(i,t,j,l) / Wmax))
 
-        if (S_wc1(j,l) .ne. S_wc1(j,l)) then
-          write(*,*) "FATAL: S_wc1 is NaN in unfrozen nova_step"
-          write(*,*) "rank=", rank, " i=", i, " t=", t, " j=", j, " l=", l
-          write(*,*) "W_c1=", W_c1(i,t,j,l), " Wmax=", Wmax
-          stop
-        endif
-
-        Q_Per1 = max(0.0, min(Qp0 * S_wc1(j,l) * p_dt, W_c1(i,t,j,l)))
+        ! Step 4: percolation based on updated saturation
+        Q_Per1 = min(Qp0 * S_wc1(j,l) * p_dt, W_c1(i,t,j,l))
         W_c1(i,t,j,l) = W_c1(i,t,j,l) - Q_Per1
-        W_c1(i,t,j,l) = max(0.0, min(W_c1(i,t,j,l), Wmax))
 
+        ! Step 5: root uptake weighted by root biomass
         if (sum(Br(i,j,:)) .gt. p_critD) then
-          QR1(i,t,j,l) = min(max(0.0, QRpot) * Br(i,j,l) / sum(Br(i,j,:)), W_c1(i,t,j,l))
+          QR1(i,t,j,l) = min(QRpot * Br(i,j,l) / sum(Br(i,j,:)), W_c1(i,t,j,l))
         else
           QR1(i,t,j,l) = 0.0
         endif
-
         W_c1(i,t,j,l) = W_c1(i,t,j,l) - QR1(i,t,j,l)
-        W_c1(i,t,j,l) = max(0.0, min(W_c1(i,t,j,l), Wmax))
 
-        S_wc1(j,l) = W_c1(i,t,j,l) / Wmax
-        S_wc1(j,l) = max(0.0, min(1.0, S_wc1(j,l)))
+        ! Step 6: update saturation after uptake
+        S_wc1(j,l) = max(0.0, min(1.0, W_c1(i,t,j,l) / Wmax))
 
-        QRpot = max(0.0, QRpot - QR1(i,t,j,l))
+        ! Step 7: reduce remaining uptake demand
+        if (QRpot .gt. 0.0) then
+          QRpot = QRpot - QR1(i,t,j,l)
+        else
+          QRpot = 0.0
+        endif
 
         nfd(j) = nfd(j) + 1.0
-        if (S_wc1(j,l) .lt. 0.01) MD0(j) = MD0(j) + 1
 
-      enddo
+        if (S_wc1(j,l) .lt. 0.01) MD0(j) = MD0(j) + 1 
+     enddo
 
       Layer_con(j)= sum(S_wc1(j,:))/(5)
       mon_cond(i,j)=mon_cond(i,j) + Layer_con(j)
