@@ -161,13 +161,13 @@ do while ( year .le. lastyear )
           
           call sc_clim ! scatter climate forcing
 
-          !fH2Ol_ad(:) = fH2Ol_ad(:) !* 0.001 ! adapt units for ERA5 or WATCH data (mm/s -> m/s)
-          !fH2Os_ad(:) = fH2Os_ad(:) !* 0.001 
+          fH2Ol_ad(:) = fH2Ol_ad(:) * 0.001 ! adapt units for ERA5 or WATCH data (mm/s -> m/s)
+          fH2Os_ad(:) = fH2Os_ad(:) * 0.001 
         else
           call lycom_readHourL ! local
 
-          fH2Ol_ad(:) = fH2Ol_ad(:) !* 0.001
-          fH2Os_ad(:) = fH2Os_ad(:) !* 0.001 
+          fH2Ol_ad(:) = fH2Ol_ad(:) * 0.001
+          fH2Os_ad(:) = fH2Os_ad(:) * 0.001 
         endif
 
         if (para) then
