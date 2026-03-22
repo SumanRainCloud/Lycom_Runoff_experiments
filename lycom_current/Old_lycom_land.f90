@@ -466,7 +466,7 @@ if (t .le. 2) then !only forest and grassland
                                 - 4.0*p_eps*c_sigma*Ta3*xT_s_dry0 * (2.0-lground) &
                                 - kSOIL(i) *(xT_s_dry0 - xT_g0(i,t)) /p_dz_SOIL * lground
 
-    if (xT_s_dry0 .lt. c_TH2Osl) then ! frozen surface
+    if (xT_s_dry0 .lt. c_TH2Osl-5) then ! frozen surface
 
       fRAD_Hw0                  = 0.0
       ETpot0                    = 0.0

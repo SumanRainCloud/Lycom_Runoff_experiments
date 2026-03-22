@@ -201,8 +201,8 @@ character (len=20)      :: dimName, varName0
 ! Open land mask file and determine resolution
 call check(nf90_open(landmask, nf90_nowrite, ncID1) )
 !!!DEBUG -- TEMPORARY FIX FOR PALEO !!!
-!!call check(nf90_inquire_dimension(ncID1, 1, dimName, nx) )
-!!call check(nf90_inquire_dimension(ncID1, 2, dimName, ny) )
+!call check(nf90_inquire_dimension(ncID1, 1, dimName, nx) )
+!call check(nf90_inquire_dimension(ncID1, 2, dimName, ny) )
 
 call check(nf90_inquire_dimension(ncID1, 2, dimName, nx) )      !! TEMPORARY
 call check(nf90_inquire_dimension(ncID1, 3, dimName, ny) )      !! TEMPORARY
@@ -1097,8 +1097,8 @@ if (rank .eq. 0) then
       call def_varG(k*1000+kfile_fCcb           ,  outvarID(10+25*(k-1)))
       call def_varG(k*1000+kfile_fCbo           , outvarID(11+25*(k-1)))
       call def_varG(k*1000+kfile_fH2Ol_ux       , outvarID(12+25*(k-1)))
-      !call def_varG(k*1000+kfile_fH2Ol_lsat     , outvarID(13+25*(k-1)))
-      !call def_varG(k*1000+kfile_fH2Ol_bsat     , outvarID(14+25*(k-1)))
+      call def_varG(k*1000+kfile_fH2Ol_lsat     , outvarID(13+25*(k-1)))
+      call def_varG(k*1000+kfile_fH2Ol_bsat     , outvarID(14+25*(k-1)))
       call def_varG(k*1000+kfile_fH2Ol_runoff_l , outvarID(15+25*(k-1)))
       call def_varG(k*1000+kfile_fCc_gpp        , outvarID(16+25*(k-1)))
       call def_varG(k*1000+kfile_fCc_npp        , outvarID(17+25*(k-1)))      
@@ -1183,9 +1183,9 @@ do k = 1,1
   call write_varG(ag_fCcb(:,k)      ,  outvarID(10+25*(k-1)))
   call write_varG(ag_fCbo(:,k)      , outvarID(11+25*(k-1)))
   call write_varG(ag_fH2Ol_ux(:,k)  , outvarID(12+25*(k-1)))
-  !call write_varG(ag_fH2Ol_lsat(:,k), outvarID(13+25*(k-1)))
-  !call write_varG(ag_fH2Ol_bsat(:,k), outvarID(14+25*(k-1)))
-  !call write_varG(ag_fH2Ol_runoff_l(:,k), outvarID(15+25*(k-1)))
+  call write_varG(ag_fH2Ol_lsat(:,k), outvarID(13+25*(k-1)))
+  call write_varG(ag_fH2Ol_bsat(:,k), outvarID(14+25*(k-1)))
+  call write_varG(ag_fH2Ol_runoff_l(:,k), outvarID(15+25*(k-1)))
   call write_varG(ag_fCc_gpp(:,k)   , outvarID(16+25*(k-1)))
   call write_varG(ag_fCc_npp(:,k)   , outvarID(17+25*(k-1)))
   call write_varG(ag_fH2Ol_xd(:,k)  , outvarID(18+25*(k-1)))

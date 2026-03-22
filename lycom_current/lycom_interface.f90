@@ -435,10 +435,10 @@ if (writeout) then
   ! properties which are specific for lycophytes
   ah_area_s(h)                  = as_area_s
 
-  !ah_rH2Ol(h)                   = as_rH2Ol_t
+  ah_rH2Ol(h)                   = as_rH2Ol_t
                                   !rH2Ol_0(i,t,v,h) /rmaxH2Ol_0 * (1.0-as_areaTH_s) &
   
-  !ah_rmaxH2Ol(h)                = as_rmaxH2Ol_t
+  ah_rmaxH2Ol(h)                = as_rmaxH2Ol_t
                                   !rmaxH2Ol_0 *1000.0 * (1.0-as_areaTH_s)
 
   !ah_act(h)                     = as_act
@@ -559,8 +559,8 @@ if (writeout) then
   ! flux/reservoir depends on habitat
   av_area_s(v)                = 0.0
   
-  !av_rH2Ol(v)                   = 0.0
-  !av_rmaxH2Ol(v)                = 0.0
+  av_rH2Ol(v)                   = 0.0
+  av_rmaxH2Ol(v)                = 0.0
   av_fH2Ol_lsat(v)              = 0.0
   av_fH2Ol_bsat(v)              = 0.0
   !av_act(v)                     = 0.0
@@ -614,8 +614,8 @@ if (writeout) then
     av_fH2Ol_runoff_l(v)          = av_fH2Ol_runoff_l(v) + ah_fH2Ol_runoff_l(k) 
     av_fCc_gpp(v)                 = av_fCc_gpp(v) + ah_fCc_gpp(k)
     av_fCc_npp(v)                 = av_fCc_npp(v) + ah_fCc_npp(k)
-    !av_rH2Ol(v)                 = av_rH2Ol(v) + ah_rH2Ol(k) * wgthab
-    !av_rmaxH2Ol(v)              = av_rmaxH2Ol(v) + ah_rmaxH2Ol(k) * wgthab
+    av_rH2Ol(v)                 = av_rH2Ol(v) + ah_rH2Ol(k) * wgthab
+    av_rmaxH2Ol(v)              = av_rmaxH2Ol(v) + ah_rmaxH2Ol(k) * wgthab
     !av_act(v)                   = av_act(v) + ah_act(k) * wgthab
     av_rCO2d(v)                 =  av_rCO2d(v) + ah_rCO2d(k) 
 !    av_sCO2d(v)                 = av_sCO2d(v) + ah_sCO2d(k) 
@@ -653,13 +653,13 @@ if (writeout) then
 
 
 
-!    av_rH2Ol_g1                 = rH2Ol_g1(i,t) *1000.0           !av_rH2Ol_g1 + 
-!    av_rH2Ol_g2                 = rH2Ol_g2(i,t) *1000.0           !av_rH2Ol_g2 + 
+  av_rH2Ol_g1                 = rH2Ol_g1(i,t) *1000.0           !av_rH2Ol_g1 + 
+  av_rH2Ol_g2                 = rH2Ol_g2(i,t) *1000.0           !av_rH2Ol_g2 + 
 
-!    av_fH2Ol_ug                 = fH2Ol_ug *1000.0*c_year       !av_fH2Ol_ug + 
-!    av_fH2Ol_go                 = fH2Ol_go *1000.0*c_year       !av_fH2Ol_go + 
-!    av_fH2Ol_gb                 = fH2Ol_gb *1000.0*c_year       !av_fH2Ol_gb + 
-!    av_fH2Olg_ga                = fH2Olg_ga1 *1000.0*c_year     !av_fH2Olg_ga +
+  !av_fH2Ol_ug                 = fH2Ol_ug *1000.0*c_year       !av_fH2Ol_ug + 
+  av_fH2Ol_go                 = fH2Ol_go *1000.0*c_year       !av_fH2Ol_go + 
+  av_fH2Ol_gb                 = fH2Ol_gb *1000.0*c_year       !av_fH2Ol_gb + 
+  av_fH2Olg_ga                = fH2Olg_ga1 *1000.0*c_year     !av_fH2Olg_ga +
 
 !  else ! canopy
 
@@ -711,8 +711,8 @@ if (writeout) then
 
     at_area_s(t,k)               = av_area_s(k) ! this always refers to cover per available area
 
-    !at_rH2Ol(t,k)                  = av_rH2Ol(k) *ratioCG
-    !at_rmaxH2Ol(t,k)               = av_rmaxH2Ol(k) *ratioCG
+    at_rH2Ol(t,k)                  = av_rH2Ol(k) *ratioCG
+    at_rmaxH2Ol(t,k)               = av_rmaxH2Ol(k) *ratioCG
 
     at_fH2Ol_lsat(t,k)             = av_fH2Ol_lsat(k) *ratioCG
     at_fH2Ol_bsat(t,k)             = av_fH2Ol_bsat(k) *ratioCG
@@ -721,7 +721,6 @@ if (writeout) then
     at_fCc_npp(t,k)                = av_fCc_npp(k)*ratioCG
     at_act(t,k)                    = av_act(k)
     at_rCO2d(t,k)                  = av_rCO2d(k)
-!    at_sCO2d(t,k)                  = av_sCO2d(k)
     at_rCb(t,k)                    = av_rCb(k) *ratioCG
     at_fCO2gc(t,k)                 = av_fCO2gc(k) *ratioCG
     at_fCcg(t,k)                   = av_fCcg(k) *ratioCG
@@ -744,13 +743,13 @@ if (writeout) then
   at_Tg(t)                      = av_Tg
   at_G(t)                       = av_G
 !!!!!!!!!!!AD THE WATER FLUXES BELOW!!!!!!!!!!!!!!   OR REMOVE THESE
-!  at_rH2Ol_g1(t)                = av_rH2Ol_g1
-!  at_rH2Ol_g2(t)                = av_rH2Ol_g2
+  at_rH2Ol_g1(t)                = av_rH2Ol_g1
+  at_rH2Ol_g2(t)                = av_rH2Ol_g2
                         
-!  at_fH2Ol_ug(t)                = av_fH2Ol_ug
-!  at_fH2Ol_go(t)                = av_fH2Ol_go
-!  at_fH2Ol_gb(t)                = av_fH2Ol_gb
-!  at_fH2Olg_ga(t)               = av_fH2Olg_ga
+  at_fH2Ol_ug(t)                = av_fH2Ol_ug
+  at_fH2Ol_go(t)                = av_fH2Ol_go
+  at_fH2Ol_gb(t)                = av_fH2Ol_gb
+  at_fH2Olg_ga(t)               = av_fH2Olg_ga
 
 !  at_fH2Ol_ug2(t)               = av_fH2Ol_ug2
 endif
@@ -798,8 +797,8 @@ if (writeout) then
 
       ag_area_s(i,l)          =  ag_area_s(i,l) + at_area_s(k,l) 
 
-      !ag_rH2Ol(i,l)             = ag_rH2Ol(i,l)     + at_rH2Ol(k,l) * frac_tile(i,k)
-      !ag_rmaxH2Ol(i,l)          = ag_rmaxH2Ol(i,l)  + at_rmaxH2Ol(k,l) * frac_tile(i,k)
+      ag_rH2Ol(i,l)             = ag_rH2Ol(i,l)     + at_rH2Ol(k,l) * frac_tile(i,k)
+      ag_rmaxH2Ol(i,l)          = ag_rmaxH2Ol(i,l)  + at_rmaxH2Ol(k,l) * frac_tile(i,k)
       !ag_act(i,l)               = ag_act(i,l)       + at_act(k,l) * frac_tile(i,k)
       ag_fH2Ol_lsat(i,l)         = ag_fH2Ol_lsat(i,l) + at_fH2Ol_lsat(k,l) 
       ag_fH2Ol_bsat(i,l)         = ag_fH2Ol_bsat(i,l) + at_fH2Ol_bsat(k,l)
@@ -807,7 +806,7 @@ if (writeout) then
       ag_fCc_gpp(i,l)           = ag_fCc_gpp(i,l) + at_fCc_gpp(k,l)
       ag_fCc_npp(i,l)           =  ag_fCc_npp(i,l) + at_fCc_npp(k,l)
       ag_rCO2d(i,l)             =  ag_rCO2d(i,l) + at_rCO2d(k,l) 
-!      ag_sCO2d(i,l)             = ag_sCO2d(i,l)     + at_sCO2d(k,l) * frac_tile(i,k)
+      ag_sCO2d(i)             = ag_sCO2d(i)     + at_sCO2d(k) * frac_tile(i,k)
       ag_rCb(i,l)               =  ag_rCb(i,l) + at_rCb(k,l) 
       ag_fCO2gc(i,l)            =  ag_fCO2gc(i,l) + at_fCO2gc(k,l) 
       ag_fCcg(i,l)              =  ag_fCcg(i,l) + at_fCcg(k,l) 
@@ -833,13 +832,13 @@ if (writeout) then
 !    ag_fH2Ol_ug2(i)             = ag_fH2Ol_ug2(i)  + at_fH2Ol_ug2(k) * frac_tile(i,k)
     !ag_fH2Ol_bd(i)              = ag_fH2Ol_bd(i)   + at_fH2Ol_bd(k) * frac_tile(i,k)
   
-!    ag_rH2Ol_g1(i)              = ag_rH2Ol_g1(i)   + at_rH2Ol_g1(k) * frac_tile(i,k)
-!    ag_rH2Ol_g2(i)              = ag_rH2Ol_g2(i)   + at_rH2Ol_g2(k) * frac_tile(i,k)
+    ag_rH2Ol_g1(i)              = ag_rH2Ol_g1(i)   + at_rH2Ol_g1(k) * frac_tile(i,k)
+    ag_rH2Ol_g2(i)              = ag_rH2Ol_g2(i)   + at_rH2Ol_g2(k) * frac_tile(i,k)
   
-!    ag_fH2Ol_ug(i)              = ag_fH2Ol_ug(i)   + at_fH2Ol_ug(k) * frac_tile(i,k)
-!    ag_fH2Ol_go(i)              = ag_fH2Ol_go(i)   + at_fH2Ol_go(k) * frac_tile(i,k)
-!    ag_fH2Ol_gb(i)              = ag_fH2Ol_gb(i)   + at_fH2Ol_gb(k) * frac_tile(i,k)
-!    ag_fH2Olg_ga(i)             = ag_fH2Olg_ga(i)  + at_fH2Olg_ga(k) * frac_tile(i,k)
+    ag_fH2Ol_ug(i)              = ag_fH2Ol_ug(i)   + at_fH2Ol_ug(k) * frac_tile(i,k)
+    ag_fH2Ol_go(i)              = ag_fH2Ol_go(i)   + at_fH2Ol_go(k) * frac_tile(i,k)
+    ag_fH2Ol_gb(i)              = ag_fH2Ol_gb(i)   + at_fH2Ol_gb(k) * frac_tile(i,k)
+    ag_fH2Olg_ga(i)             = ag_fH2Olg_ga(i)  + at_fH2Olg_ga(k) * frac_tile(i,k)
   enddo
 !!!!!!!!!!!!!!CHECK THESE WATER FLUXES AND ADD THEMM HERE OR REMOVE THEM  
   ag_rH2Os_g(i)                 =  ag_rH2Os_g(i) + dsnow *1000.0
