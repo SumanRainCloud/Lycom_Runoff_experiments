@@ -824,7 +824,6 @@ if (writeout) then
       ag_C(i,l)                 = ag_C(i,l) + at_C(k,l) 
       !ag_EB(i,l)                = at_EB(i,l) + at_EB(k,l) 
     enddo
-    ag_sCO2d(i)              =  ag_sCO2d(i) +at_sCO2d(k) 
     ag_Tg(i)                    =  ag_Tg(i) +at_Tg(k) 
     ag_G(i)                     =  ag_G(i) + at_G(k) 
     ag_Lai(i)                  = ag_Lai(i)  +at_Lai(k)

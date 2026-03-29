@@ -172,7 +172,7 @@ do i = 1,nCPts3
 
       Rspec(j) =0.0
       Rtres(i,j)=0.0
-      fQ_tg(i)=0.0
+      fQ_tg(j)=0.0
       xT_g(i,t,j)=0.0
       counttimer(j)=1
       Layer_con(j)=0.5
@@ -197,7 +197,7 @@ do i = 1,nCPts3
       CO2_pre(i,j)= 0.0
       netgrowth(i,t,j)            = 0.0  !!Need to check!!             !CHANGED coordinate                             ! net growth [1 / ts]
       area_s(i,t,j)= frac_s_init / real(p_nspec)
-      gpp0(i,j)     = 0.001 / 1.0 /c_MCo2 /p_dt             ! GPP in [mol C / (m2 T * s)]
+      gpp0(i,j)     = 0.0   !0.001 / 1.0 /c_MCo2 /p_dt             ! GPP in [mol C / (m2 T * s)]
      ! gpp(j)     = 0.001 / 1.0 /c_MCo2 /p_dt
       npp0(i,j) =0.0
       Bl(i,j)=20
@@ -205,8 +205,8 @@ do i = 1,nCPts3
       xT_g(i,t,j)               = 288.0
       Wx1(i,t,j)=0.5*por*0.65
       Lai_new(i,j)=2.0
-      csum(i) = 0.1
-      Lai_cum(i) =0.1
+      csum(i) = 0.0
+      Lai_cum(i) =0.0
       Run_tot(i,t,j)=0.0
       Total_mortality_root(i,j)=0.0
       do l = 1,nsoil
@@ -840,7 +840,7 @@ do j = 1,p_nspec
 
 !    netgrowth(i,t,j)= netgrowth(i,t,j)+(fCO2nc(j)*p_dt)*o_spec_area(j)*c_MCo2
     netgrowth(i,t,j)   =  netgrowth(i,t,j)  &                ! [1 / month]
-                          + (npp0(i,j) * p_dt) &
+                          + (fCO2nc(i,j) * p_dt) &
                           * o_spec_area(j) * c_MCo2
                           
     csum(i) = csum(i) + area_s(i,t,j)
@@ -1290,8 +1290,8 @@ if (writeout) then
     ! Check if lichen is alive
    
     if (klife(i,t,j) .eq. 1.0) then
-      cweight                   = area_s(i,t,j) / csum(i)
-      lweight                   = Lai_new(i,j) / Lai_cum(i)
+      cweight = area_s(i,t,j) / max(p_critD, csum(i))
+      lweight = Lai_new(i,j) / max(p_critD, Lai_cum(i))
       !write(*,*) "The LAI weight is ", lweight
       if (tim .eq. simhour ) then
         
@@ -1326,7 +1326,7 @@ if (writeout) then
       
       as_fH2Ol_runoff_l         = as_fH2Ol_runoff_l + as_fH2Ol_td(j)*cweight!area_s(i,t,j)
       
-      as_fCc_npp                = as_fCc_npp + fCO2nc(i,j)*area_s(i,t,j)
+      as_fCc_npp                = as_fCc_npp + as_npp(j)*area_s(i,t,j)
       
       as_fCc_gpp                = as_fCc_gpp + as_gpp(j) *area_s(i,t,j)
                                     
