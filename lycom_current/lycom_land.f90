@@ -340,15 +340,6 @@ fH2Ol_ci(i,t) = 0.0
 fH2Ol_ux(i,t) = 0.0
 fH2Ol_ts(i,t) = 0.0
 ! Switches
-if (i .le. 3 .and. ts .le. 3) then
-  write(*,*) "=== RAIN DIAGNOSTIC i=", i, " ts=", ts, " ==="
-  write(*,*) "Raw fH2Ol_ad(i) =", fH2Ol_ad(i)
-  write(*,*) "Scientific notation:", fH2Ol_ad(i)
-  write(*,*) "If this is ~1E-6: units are probably [m/s] ✓"
-  write(*,*) "If this is ~0.001-0.01: units are probably [kg/m²/s] or [mm/s]"
-  write(*,*) "If this is ~1-10: units are probably [mm/hr]"
-  write(*,*) "========================================"
-endif
 if (v .eq. 2) then ! canopy
   lground                       = 0.0  !at canopy(not req for my case)
 else
@@ -448,28 +439,6 @@ endif
 
 
 fH2Ol_ux(i,t)= fH2Ol_ux(i,t) + fH2Osl_g * p_dt  !add snow melt
-if (i .le. 3 .and. t .eq. 1) then
-  write(*,*) "=== WATER BALANCE DEBUG i=", i, " ===="
-  write(*,*) "rain =", rain
-  write(*,*) "fH2Ol_ci(i,t) =", fH2Ol_ci(i,t)
-  write(*,*) "fH2Ol_ts(i,t) =", fH2Ol_ts(i,t)
-  write(*,*) "fH2Ol_ux BEFORE snowmelt =", fH2Ol_ux(i,t) - fH2Osl_g * p_dt
-  write(*,*) "fH2Osl_g =", fH2Osl_g
-  write(*,*) "fH2Osl_g * p_dt =", fH2Osl_g * p_dt
-  write(*,*) "rH2Os_g(i) =", rH2Os_g(i)
-  write(*,*) "fH2Os_ad(i) =", fH2Os_ad(i)
-  write(*,*) "fH2Ol_ux AFTER snowmelt =", fH2Ol_ux(i,t)
-  write(*,*) "==============================="
-endif
-!do m=1,i
-!  do n=1,t
-!    Wx(m,n) =  0.5*por*0.65
-!    xT_g0(m,n)                = 288.0 !xT_a(i)                               ! bare ground temperature [K] 	*changed accorsing to lycom
-!    do o=1,nsoil
-!      W_c0(m,n,o)=0.5*por*0.03
-!    enddo
-!  enddo
-!enddo
 
 return 
 end subroutine land_stepV
@@ -633,7 +602,9 @@ else !wetland or rock
   fH2Ol_bd0                     = 0.0
   xT_s0                         = xT_a(i)
   fRAD_H0                       = 0.0
-
+  fQ_ta_L0                      = 0.0
+  fQ_ta_S0                      = 0.0
+  fH2Ol_go                      = 0.0
 
 
 
@@ -677,6 +648,7 @@ Q_Oflow   = 0.0
 Q_Oflow2  = 0.0
 Q_Oflow_b = 0.0
 Q_Oflow_b2= 0.0
+W_con_ll  = 0.0
 
 ! ------------------------------------------------------------------
 ! Global safety checks
@@ -747,9 +719,6 @@ else
   if (fH2Ol_gwl .ne. fH2Ol_gwl) then
     write(*,*) "FATAL: fH2Ol_gwl is NaN in land_stepvTrans"
     write(*,*) "rank=", rank, " i=", i, " t=", t
-    write(*,*) "fH2Ol_ux(i,t)=", fH2Ol_ux(i,t)
-    write(*,*) "fH2Ol_xd0=", fH2Ol_xd0
-    write(*,*) "fH2Ol_ad(i)=", fH2Ol_ad(i)
     stop
   endif
 
@@ -923,7 +892,7 @@ end subroutine land_stepvTrans
 !**************************************************************************
 subroutine check_initialization(nCPts3)
 use lycom_par
-
+use lycom_opt
 
 
 implicit none
