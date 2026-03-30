@@ -171,13 +171,13 @@ do i = 1,nCPts3
     do j = 1,p_nspec
 
       Rspec(j) =0.0
+      fCcg_M(j)   = 0.0
       Rtres(i,j)=0.0
       fQ_tg(j)=0.0
       xT_g(i,t,j)=0.0
       counttimer(j)=1
       Layer_con(j)=0.5
       S2(j)=0.5
-      fCcg_M(j)=0.0
       Mrt_tot(i,j)=0.0
       as_fH2Ol_td(j)=0.0
       MD0(j)=0.0
@@ -197,8 +197,7 @@ do i = 1,nCPts3
       CO2_pre(i,j)= 0.0
       netgrowth(i,t,j)            = 0.0  !!Need to check!!             !CHANGED coordinate                             ! net growth [1 / ts]
       area_s(i,t,j)= frac_s_init / real(p_nspec)
-      gpp0(i,j)     = 0.0   !0.001 / 1.0 /c_MCo2 /p_dt             ! GPP in [mol C / (m2 T * s)]
-     ! gpp(j)     = 0.001 / 1.0 /c_MCo2 /p_dt
+      gpp0(i,j)     = 0.0            ! GPP in [mol C / (m2 T * s)]
       npp0(i,j) =0.0
       Bl(i,j)=20
       bsum(i,j)=40.0
@@ -262,6 +261,7 @@ real    :: D1c, D2c, bc, cc, discc, xc, K0,Jo, Ix
 real    :: Bin,Bout
 real    :: ngsum, wgtsum, expsum, hsum
 real    :: retreat, disturbance
+real    :: csum_area
 real    :: rain
 real    :: gSleaf, gSleaf2
 real    :: dRAD, fRAD_Hw, fRAD_Hd,fracRADs_0,fracRADl_c
@@ -319,20 +319,17 @@ fH2Ol_ux1(i,t)                  =max(0.0, w_rain_canopy) ! water input into soil
 if (Wmax .le. p_critD .or. Wmax .ne. Wmax) then
   write(*,*) "FATAL: invalid Wmax in nova_step"
   write(*,*) "rank=", rank, " i=", i, " t=", t, " Wmax=", Wmax
-  stop
 endif
 
 if (Wxmax .le. p_critD .or. Wxmax .ne. Wxmax) then
   write(*,*) "FATAL: invalid Wxmax in nova_step"
   write(*,*) "rank=", rank, " i=", i, " t=", t, " Wxmax=", Wxmax
-  stop
 endif
 
 if (Qp0 .ne. Qp0 .or. Qb0 .ne. Qb0 .or. p_dt .le. 0.0 .or. p_dt .ne. p_dt) then
   write(*,*) "FATAL: invalid hydraulic/time parameter in nova_step"
   write(*,*) "rank=", rank, " i=", i, " t=", t
   write(*,*) "Qp0=", Qp0, " Qb0=", Qb0, " p_dt=", p_dt
-  stop
 endif
 
 !-----------------------------------------------------------------------
@@ -447,6 +444,10 @@ do j = 1,p_nspec
       ETact                = 0.0
       ETpot                = 1.0
       wetfrac              = 0.0
+      Rspec(j)              = 0.0
+      fCcg_M(j)             = Rspec(j)
+      fCO2gc_L(j) = 0.0
+      fCO2gc_W(j) = 0.0
       fH2Olg_xu(j)            = 0.0
       fH2Ol_bx(j)             = 0.0
       fH2Ol_bd(j)             = 0.0
@@ -512,13 +513,6 @@ do j = 1,p_nspec
     else
       xT_s(j)= xT_s_dry
       
-      !write (*,*) "Enters part when the temp is not less than -5 degree C"
-      fCcg_M(j)                 = Rspec(j)                         ! maintenance resp. [mol / (m2 T * s)]
-      fCO2gc(i,j) = 0.0   ! no photosynthesis when frozen
-      fCO2nc(i,j) = 0.0   ! no
-      fCcb(j)                   = 0.0 !gpp0(j) - (fCcg_M(j)*p_dt* c_MCo2)          ! NPP [mol / (m2 T * s)]
-!        write(*,*) "fCcb value is ", fCcb(j)
-!        if (fCcb(j) .gt. 0.0) fCcb(j) = fCcb(j) * Ngrow ! growth efficiency
 
       fCbo(j)                   =  Mrt_tot(i,j)/c_year /c_MCo2 &         ! litterfall of photobiont [mol / (m2 T * s)]
                                 / o_spec_area(j) ! * act(j)
@@ -553,7 +547,6 @@ do j = 1,p_nspec
         if (Qin1(i,t,j,l) .ne. Qin1(i,t,j,l)) then
           write(*,*) "FATAL: Qin1 is NaN in unfrozen nova_step"
           write(*,*) "rank=", rank, " i=", i, " t=", t, " j=", j, " l=", l
-          stop
         endif
 
         W_c1(i,t,j,l) = W_c1(i,t,j,l) + Qin1(i,t,j,l)
@@ -575,7 +568,6 @@ do j = 1,p_nspec
           write(*,*) "FATAL: S_wc1 is NaN in unfrozen nova_step"
           write(*,*) "rank=", rank, " i=", i, " t=", t, " j=", j, " l=", l
           write(*,*) "W_c1=", W_c1(i,t,j,l), " Wmax=", Wmax
-          stop
         endif
 
         if (W_c1(i,t,j,l) .lt. wlim .or. S_wc1(j,l) .lt. wlim) then
@@ -666,16 +658,6 @@ do j = 1,p_nspec
     !write (*,*) "crgas is ", c_Rgas
     if (gS .gt. p_critD) then
 
-      !write (*,*) "The productivity condition is entered"
-      !write (*,*) "The xT_s",xT_s(j) 
-      !write (*,*) "Optimum temperature",o_ToptP(j)
-      !write (*,*) "o_Eact_Kc(j)", o_Eact_Kc(j)
-      !write (*,*) "This is using KCFT"
-      !write (*,*) "fQ_ta_S is ", fQ_ta_S(j)
-      !write (*,*) "fQ_ta_L is", fQ_ta_L(j)
-      !write (*,*) "fRAD_H is ", fRAD_H(j)
-      !write (*,*) "fQ_tg", fQ_tg(j)
-      !write (*,*) "XT_g is (outside the loop)",xT_g(i,t,j)
       KcfT  = exp(max((xT_s(j) - o_ToptP(j)) &          ! temperature response of Michaelis-Menten-Constant []                  REF: Medlyn,2002
                 * o_Eact_Kc(j) / (o_ToptP(j) * c_Rgas * xT_s(j)), 0.0))
       !write (*,*) "The KcfT calculation done", KcfT   
@@ -744,7 +726,7 @@ do j = 1,p_nspec
 
                   
       Al_r  = (Jo * (xl - P) / (4.5* xl + 10.5*P))
-      fCO2gc_L(j)=Al
+      fCO2gc_L(j)=Al_r
 
 !      %%%% CO2-limited rate
      
@@ -763,13 +745,16 @@ do j = 1,p_nspec
      
       Ac_r  = (vcmax(j) * (xc-P) / (xc + Kc*(1.0 + rO2g_a /1.0e6 * sO2 *1000  / Ko)))
       !write (*,*) "The productivity carbon calculation GPP is", Ac_r
-      fCO2gc_W(j)=Ac
+      fCO2gc_W(j)=Ac_r
     else
        ! Acs=Acs+1.0 commented out
       Ac_r= 0.0
       Al_r = 0.0
       Al=0.0
       Ac=0.0 
+      Rspec(j)= 0.0
+      fCcg_M(j)= 0.0
+
         !Rspec(j)                       = o_resp_main(j) &                      ! [mol / (m2 T * s)]                                                    REF: Kruse,2010
          !                                   * o_Q10_resp(j) &
           !                                  **((xT_s(j) - o_ToptP(j)) / 10.0)
@@ -838,7 +823,10 @@ do j = 1,p_nspec
   else
     !write (*,*) "The Klife is changed to 0. THe species dies"
     klife(i,t,j)=0.0
-
+    area_s(i,t,j)   = 0.0
+    netgrowth(i,t,j)= 0.0
+    fCO2gc(i,j)     = 0.0
+    fCO2nc(i,j)     = 0.0
   endif  !klife!
   !write (*,*) "Species number ", j
   !write (*,*) "i value", i
@@ -857,7 +845,7 @@ if (day .eq. dpm .and. ts .eq. tspd) then
     !M0(j)                          = M0(j) + kMrt0* bsum(j)*dpm*tspd
       npp0(i,j) = npp0(i,j) * c_MCo2 * Ngrow * p_dt
 
-      gpp0(i,j) = gpp0(i,j) * c_MCo2 * Ngrow * p_dt
+      gpp0(i,j) = gpp0(i,j) * c_MCo2 * p_dt
 
       if (Als(i,j)+Acs(i,j) .le. 0.0) then
     
@@ -919,7 +907,7 @@ if (day .eq. dpm .and. ts .eq. tspd) then
       Mrt_tot(i,j) = Mrt(j)*Bl(i,j)/max(p_critD, bsum(i,j))+Rtres(i,j)+Total_mortality_root(i,j)     !total dead matter in soil
       if (klife(i,t,j) .eq. 1 )then
 
-        M_cond(j)=mon_cond(i,j)/counttimer(j)
+        M_cond(j)=mon_cond(i,j)/real(max(1, counttimer(j)))
         res_por(j)=por*(1-M_cond(j))
         if (res_por(j) .gt. 1.0) then
           write (*,*) "The remaining porosity is more than 1 "
@@ -964,10 +952,13 @@ if (day .eq. dpm .and. ts .eq. tspd) then
       Total_mortality_root(i,j)=0.0
       Run_tot(i,t,j)=Run_tot(i,t,j) + max(0.0,fH2Ol_xd(j))
       mon_cond(i,j)=0.0
-      counttimer(j)=0
+      counttimer(j)=1
     endif
   enddo
-
+  csum_area = sum(area_s(i,t,:))
+  if (csum_area .gt. 1.0) then
+    area_s(i,t,:) = area_s(i,t,:) / csum_area
+  endif
   ngsum=0.0
   do m = 1,p_nspec
     if (klife(i,t,m) .eq. 1.0) ngsum=ngsum +max(0.0, netgrowth(i,t,m))
@@ -987,7 +978,7 @@ if (day .eq. dpm .and. ts .eq. tspd) then
 
         wgtspec(j)              = 1.0 &                                 ! equal weights at low cover (no competition)
                                 * ( ( max(0.0,netgrowth(i,t,j)) &                                 
-                                / ngsum )**csum(i) )**2                    ! competition under low disturbance -> weighting by net growth    !May be keep it or use "LAI"
+                                / ngsum )**csum_area )**2                    ! competition under low disturbance -> weighting by net growth    !May be keep it or use "LAI"
 
 !        wgtspec(j)              = 1.0                                   ! equal weights (neutral model)
 
@@ -1004,11 +995,12 @@ if (day .eq. dpm .and. ts .eq. tspd) then
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!******
         expansion(j)       = max(0.0, min( &                       ! [m2 T / m2 V / month]
                                   netgrowth(i,t,j) *area_s(i,t,j), & ! mass balance constraint
-                                  (1.0 - csum(i)) &                        ! available area
+                                  max(0.0,(1.0 - csum_area)) &                        ! available area
                                 * p_NCbt &                              ! establishment
-                                * wgtspec(j) /wgtsum) )                 ! competition                                          !!must decide
+                                * wgtspec(j) /max(p_critD,wgtsum)) )                 ! competition                                          !!must decide
 
       else
+
         expansion(j)       = 0.0
       endif
     enddo
@@ -1019,7 +1011,7 @@ if (day .eq. dpm .and. ts .eq. tspd) then
   if (expsum .gt. p_critD) then
     !must decide
     expansion(:)                = expansion(:) * min(1.0, &       !!!!must decide
-                                  (1.0-csum(i)) / expsum)
+                                  max(0.0, (1.0-csum_area)) / expsum)
   else
     expansion(:)                = 0.0
   endif
@@ -1052,6 +1044,7 @@ if (day .eq. dpm .and. ts .eq. tspd) then
                                 
                                 
       netgrowth(i,t,j)      = 0.0
+
       if (area_s(i,t,j) .gt. 1.0) then
 
         write(*,*) "Invalid area "
@@ -1079,6 +1072,10 @@ if (day .eq. dpm .and. ts .eq. tspd) then
     endif ! check for survival
 
   enddo ! End of loop over all species - III -
+  csum_area = sum(area_s(i,t,:))
+  if (csum_area .gt. 1.0) then
+    area_s(i,t,:) = area_s(i,t,:) / csum_area
+  endif
 endif ! End of execute once per month
 
 !write (*,*) "LYcophyte_nova_crucial calculátions in lycophytes: is close to end"
