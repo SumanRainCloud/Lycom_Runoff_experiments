@@ -697,24 +697,8 @@ else
   Rnet    = fRADs_ad(i)*0.85 + p_eps*fRADl_ad(i) - p_eps*c_sigma*Ta4
   ETpot_v = 1.4 * Rnet * desatdT / (desatdT + c_gamma) / c_HH2Olg / c_rhoH2Ol
   ETpot_v = max(0.0, ETpot_v)
-  if (Wx(i,t) .gt. p_critD) then
-    if (p_rmaxH2Ol_g2 .le. p_critD .or. p_rmaxH2Ol_g2 .ne. p_rmaxH2Ol_g2) then
-      write(*,*) "FATAL: invalid p_rmaxH2Ol_g2"
-      write(*,*) "rank=", rank, " i=", i, " t=", t, " p_rmaxH2Ol_g2=", p_rmaxH2Ol_g2
-      call flush(6)
-      stop
-    endif
-
-    rootuptk = Wx(i,t) / p_dt
-    call flush(6)
-    rootuptk = min(rootuptk, p_kH2Ol_sv * (Wx(i,t) / p_rmaxH2Ol_g2)**2)
-    rootuptk = max(0.0, rootuptk)
-  else
-    rootuptk = 0.0
-  endif
-
-  trans = min(ETpot_v, rootuptk) * p_dt
-  trans = max(0.0, trans)
+  rootuptk = 0.0
+  trans    = 0.0
 
   if (fH2Ol_gwl .ne. fH2Ol_gwl) then
     write(*,*) "FATAL: fH2Ol_gwl is NaN in land_stepvTrans"

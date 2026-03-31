@@ -166,8 +166,7 @@ do i = 1,nCPts3
   Lai_cum(i) =0.0
       
   do t = 1,p_ntiles
-    !Wx(i,t)= 0.5 * por * 0.65
-    !!xT_g0(i,t) = 288.0
+
     do j = 1,p_nspec
 
       Rspec(j) =0.0
@@ -196,21 +195,20 @@ do i = 1,nCPts3
       CO2_sink(i,j)=0.0
       CO2_pre(i,j)= 0.0
       netgrowth(i,t,j)            = 0.0  !!Need to check!!             !CHANGED coordinate                             ! net growth [1 / ts]
-      area_s(i,t,j)= frac_s_init / real(p_nspec)
+      area_s(i,t,j)= 0.0 
       gpp0(i,j)     = 0.0            ! GPP in [mol C / (m2 T * s)]
       npp0(i,j) =0.0
-      Bl(i,j)=20
-      bsum(i,j)=40.0
+      Bl(i,j)=0.0
+      bsum(i,j)=0.0
       xT_g(i,t,j)               = 288.0
       Wx1(i,t,j)=0.5*por*0.65
-      Lai_new(i,j)=2.0
+      Lai_new(i,j)=0.0
       Run_tot(i,t,j)=0.0
       Total_mortality_root(i,j)=0.0
       do l = 1,nsoil
         Qin1(i,t,j,l) =0.0
-        Br(i,j,l)=4
+        Br(i,j,l)=0.0
         W_c1(i,t,j,l)=0.5*por*0.03
-        !W_c0(i,t,l) = 0.5 *por* 0.03
       enddo
       
     enddo
@@ -270,6 +268,8 @@ real    :: a, b, d, xl, Al, Al_r, Ac, Ac_r, K
 real    :: hmon
 real    :: QRpot
 real, parameter  :: wlim = 1.0e-4
+
+
 kcccc=0
 simhour = lastyear*365*24 
 ETact=0.0
@@ -344,894 +344,62 @@ else
   lground                       = 1.0   !at groudlevel (soil)
 endif
 
-do j = 1,p_nspec
-  
-  !write (*,*) "species number is", j
-  Q_Per1   = 0.0
-  Q_Oflow1 = 0.0
-  wetfrac =0.0
-  fCO2gc(i,j) = 0.0
-  fCO2nc(i,j) = 0.0
-  ! Check if lycophyte is alive
+! No-vegetation run: disable all lycophyte processes
+do j = 1, p_nspec
+  klife(i,t,j)      = 0.0
+  fCO2gc(i,j)       = 0.0
+  fCO2nc(i,j)       = 0.0
+  gpp0(i,j)         = 0.0
+  npp0(i,j)         = 0.0
+  netgrowth(i,t,j)  = 0.0
+  area_s(i,t,j)     = 0.0
+  Runoff1(i,t,j)    = 0.0
+  Run_tot(i,t,j)    = 0.0
+  Mrt_tot(i,j)      = 0.0
+  CO2_sink(i,j)     = 0.0
+  CO2_pre(i,j)      = 0.0
+  fH2Ol_xd(j)       = 0.0
+  fCcg_M(j)         = 0.0
+  fCcb(j)           = 0.0
+  fCbo(j)           = 0.0
+  Rspec(j)          = 0.0
+  Layer_con(j)      = 0.0
+  S2(j)             = 0.0
+enddo
 
-  if (Bl(i,j) .ge. 0.001 .and. sum(Br(i,j,:)) .ge. 0.001) then                         !Klife(i,t,j) .eq. 1) then
-  
-    Klife(i,t,j) = 1.0
-
-    fracRADs_0                    = 1.0 - exp(-p_beer_s * Lai_new(i,j))         !*all global var even the limits
-    
-
-    fracRADl_c                    = 1.0 - exp(-p_beer_l * Lai_new(i,j))         !*all global var even the limits
-
-
-    fracRADs 			  =(1- fracRADs_0)* (1.0 - exp(-p_beer_s*Lai_new(i,j))) *(1.0-o_albedo2(j))    !*all global var even the limits
-
-    fracRADl			  = (1-fracRADl_c)*exp(-p_beer_l * Lai_new(i,j))        !*all global var even the limits
-
-    Ta3                           =xT_a(i)*xT_a(i)*xT_a(i)           !local
-    Ta4                           =Ta3*xT_a(i)                       !local
-    zT_a                          =xT_a(i)- c_TH2Osl                 !local
-
-    esatAIR 			  = p_esatAIR3 *exp(p_esatAIR1*zT_a / (p_esatAIR2 + zT_a))   !local
-   
-    desatdT 			  = exp(p_esatAIR1*zT_a/(p_esatAIR2 &     !local slope of saturation vapour pressure vs temperature relationship []
-             		                   + zT_a)) &
-             		                   * (p_esatAIR1 *p_esatAIR2 *p_esatAIR3 &
-             		                   / ((p_esatAIR2 + zT_a) &
-             		                   * (p_esatAIR2 + zT_a)))
-
-
-
-
-
-    
-
-    Rnet 			  = fRADs_ad(i)*(1.0-o_albedo2(j)) + p_eps*fRADl_ad(i) - p_eps*c_sigma* xT_a(i)**4  !local
-
-    if (zT_a .gt. 0.0) then
-      ETdata = 1.3 * Rnet * desatdT / ( desatdT + c_gamma) / c_HH2Olg / c_rhoH2Ol                                 !*global
-    else
-
-      ETdata = 0.0                                                                                       
-    endif
-    
-    !write (*,*) "The input of ETdavgdata from map",ETdavgdata(i)
-    !ETratio = max(p_critD, ETdata /ETdavgdata(i)) !NEW COMMENTED-BELOW VALUE USED
-    ETratio =  max(p_critD, ETdata /2.6409E-8)                                                                   !global
-    !write (*,*) "The input of ETrmaxdata from map",ETrmaxdata(i)
-
-    !gSleaf = min(o_gS0(j) , o_gS0(j)/(ETratio**(log(p_gS1) / log(ETrmaxdata(i)))))  !NEW COMMENTED-BELOW VALUE USEDi
-    gSleaf =  min(o_gS0(j) , o_gS0(j)/(ETratio**(log(p_gS1) / log(11.448))))                                            !global all
-    
-    gamma2 = c_gamma * (1.0 + kH2Og / gSleaf)                                                                     !global
-
-    gSleaf2 = o_gS0(j) * Layer_con(j)
-
-
-    gS = max(p_critD, min(gSleaf, gSleaf2))  
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!dsnow contraint is removed (commented)
-
-!!!!!More stuffs need to be added here                                                                         !local
-!    else
-    !write(*,*) "The part when snow is less than critical" 
-    
-    grh		 = gamma2 / kH2Og  
-                                                                       !local
-    cdg 		 = c_CAIR *(desatdT+gamma2)                                                               !local
-                 
-    xT_s_wet 		 = ( grh * (fRADs_ad(i)*fracRADs +fracRADl *p_eps * fRADl_ad(i) &                         !local
-              		+ ((1.0-fracRADl) + 3.0) *p_eps *c_sigma *Ta4 +kSOIL(i)/p_dz_SOIL*xT_g(i,t,j)) &
-              		+ xT_a(i)*cdg -c_CAIR*(esatAIR-rH2Og_RH(i)*esatAIR) ) /( grh*(4.0*p_eps*c_sigma*Ta3 &
-              		+ kSOIL(i) /p_dz_SOIL ) + cdg )
-      
-    crh 		 = 1.0/(c_CAIR*kH2Og)                                                                     !local
-                               
-    xT_s_dry 		 = ( xT_a(i) +crh*(fRADs_ad(i)*fracRADs +fracRADl *p_eps *fRADl_ad(i) &                   !local
-                	+ ((1.0-fracRADl)+ 3.0) *p_eps *c_sigma *Ta4 +kSOIL(i)/p_dz_SOIL*xT_g(i,t,j)) ) &
-                	/ ( 1.0 + crh*(4.0*p_eps*c_sigma*Ta3 +kSOIL(i)/p_dz_SOIL) )
-    !write(*,*) "THe dry temp is", xT_s_dry 
-! Net radiation
-
-    dRAD 		 = fRADs_ad(i)*fracRADs +fracRADl *p_eps *fRADl_ad(i) &                                   !local
-           		+ ((1.0-fracRADl) + 3.0)*p_eps*c_sigma*Ta4
-
-    fRAD_Hd 		= dRAD -4.0*p_eps*c_sigma*Ta3*xT_s_dry - kSOIL(i)*(xT_s_dry - xT_g(i,t,j)) /p_dz_SOIL   !local
-!!!!!!!!!!!!!!!!Sonwdepth also removed!!!!(commented)!!!!!    
-    if (xT_s_dry .le. c_TH2Osl-5) then ! frozen surface
-        !write (*,*) "Entered part with temp less than -5"
-      fRAD_Hw                 = 0.0
-      ETact                = 0.0
-      ETpot                = 1.0
-      wetfrac              = 0.0
-      Rspec(j)              = 0.0
-      fCcg_M(j)             = Rspec(j)
-      fCO2gc_L(j) = 0.0
-      fCO2gc_W(j) = 0.0
-      fH2Olg_xu(j)            = 0.0
-      fH2Ol_bx(j)             = 0.0
-      fH2Ol_bd(j)             = 0.0
-      wetfrac                 = 0.0
-      fH2Ol_xd(j)             =fH2Ol_xd(j) +0.0
-      xT_s(j)                 = xT_s_dry        
-      !fH2Osl_g	     = 0.0                                                                                        !*global
-
-      !rH2Os_g(i)           = max(0.0, rH2Os_g(i) + fH2Os_ad(i)/1000 * p_dt- fH2Osl_g * p_dt - rH2Os_g(i) * p_H2Os_loss * p_dt )  ! %snow layer [m3 H2O / m2 G] *global
-
-      !dsnow                = rH2Os_g(i) *c_rhoH2Ol/p_rhoH2Os !  %snow depth   *global
-         
-      fCbo(j)=  Mrt_tot(i,j)/c_year /c_MCo2 &         ! litterfall of photobiont [mol / (m2 T * s)]
-                                / o_spec_area(j) ! * act(j)
-
-      fCcb(j)= 0.0!gpp0(j) - (fCcg_M(j)*p_dt* c_MCo2)! !NEW COMMENTED
-                         !Respiration under such low temp 
-                               !  * o_Q10_resp(j) &
-                                !   **((xT_s(j) - o_ToptP(j)) / 10.0) 
-
-      ! Frozen ground: no infiltration, no percolation, no root uptake
-      QRpot   = 0.0
-      Q_Per1  = 0.0
-      Q_Oflow1 = 0.0
-
-      do l = 1, nsoil
-        Qin1(i,t,j,l) = 0.0
-        if (W_c1(i,t,j,l) .lt. wlim) W_c1(i,t,j,l) = 0.0
-        S_wc1(j,l) = max(0.0, min(1.0, W_c1(i,t,j,l) / Wmax))
-        nfd(j) = nfd(j) + 1.0
-        if (S_wc1(j,l) .lt. 0.01) MD0(j) = MD0(j) + 1
-      enddo
-
-      Layer_con(j)   = sum(S_wc1(j,:)) / real(nsoil)
-      mon_cond(i,j)  = mon_cond(i,j) + Layer_con(j)
-      counttimer(j)  = counttimer(j) + 1
-
-      ! Bulk bucket gets no recharge from frozen surface
-      Wx1(i,t,j) = max(0.0, min(Wx1(i,t,j), Wxmax))
-
-      S2(j) = max(0.0, min(1.0, Wx1(i,t,j) / Wxmax))
-
-      if (ETpot .le. 0.0) then
-        wetfrac = 1.0
-      else
-        wetfrac = ETact / ETpot / 3600.0
-      endif
-
-      Q_base1(i,t,j) = max(0.0, min(Qb0 * S2(j) * p_dt, Wx1(i,t,j)))
-      Wx1(i,t,j) = Wx1(i,t,j) - Q_base1(i,t,j)
-      Wx1(i,t,j) = max(0.0, min(Wx1(i,t,j), Wxmax))
-
-      ! All throughfall runs off immediately because soil is frozen
-      Overflow = 0.0
-      Runoff1(i,t,j) = Q_base1(i,t,j) + max(0.0, fH2Ol_ux1(i,t))
-      fH2Ol_xd(j) = fH2Ol_xd(j) + max(0.0, Runoff1(i,t,j))
-
-      if (S2(j) .gt. 1.0) then
-        write(*,*) "The Soil saturation level(bucket) is more than 1 at", i
-      endif       
-        
-
-    else
-      xT_s(j)= xT_s_dry
-      
-
-      fCbo(j)                   =  Mrt_tot(i,j)/c_year /c_MCo2 &         ! litterfall of photobiont [mol / (m2 T * s)]
-                                / o_spec_area(j) ! * act(j)
-
-        
-      fH2Olg_xu(j)            = 0.0
-      fH2Ol_bx(j)             = 0.0
-      fH2Ol_bd(j)             = 0.0
-        
-
-
-        
-      fRAD_Hw = dRAD - 4.0*p_eps*c_sigma*Ta3*xT_s_wet -kSOIL(i) *(xT_s_wet - xT_g(i,t,j)) /p_dz_SOIL      !!CHEK HERE!!wet tem is used here but in lycom uses dry temp
-      
-        ! Potential Evapotranspiration Monteith 1981 m/s
-      ETpot = ( fRAD_Hw * desatdT +c_CAIR*(esatAIR-rH2Og_RH(i)*esatAIR) *kH2Og ) &
-               / (desatdT+gamma2) / c_HH2Olg / c_rhoH2Ol
- 	
-! water uptake from below
-      if (ETpot .le. 0.0) ETpot = 0.0
-      
-      QRpot = max(0.0, ETpot * p_dt)
-
-      do l = 1, nsoil
-
-        if (l .eq. 1) then
-          Qin1(i,t,j,l) = max(0.0, fH2Ol_ux1(i,t) + fH2Osl_g * p_dt)
-        else
-          Qin1(i,t,j,l) = max(0.0, Q_Per1 + Q_Oflow1)
-        endif
-
-        if (Qin1(i,t,j,l) .ne. Qin1(i,t,j,l)) then
-          write(*,*) "FATAL: Qin1 is NaN in unfrozen nova_step"
-          write(*,*) "rank=", rank, " i=", i, " t=", t, " j=", j, " l=", l
-        endif
-
-        W_c1(i,t,j,l) = W_c1(i,t,j,l) + Qin1(i,t,j,l)
-        W_c1(i,t,j,l) = max(0.0, W_c1(i,t,j,l))
-        if (W_c1(i,t,j,l) .lt. wlim) W_c1(i,t,j,l) = 0.0
-        Q_Oflow1 = max(0.0, W_c1(i,t,j,l) - Wmax)
-        W_c1(i,t,j,l) = W_c1(i,t,j,l) - Q_Oflow1
-        W_c1(i,t,j,l) = max(0.0, min(W_c1(i,t,j,l), Wmax))
-
-        if (W_c1(i,t,j,l) .lt. wlim) then
-          W_c1(i,t,j,l) = 0.0
-          S_wc1(j,l) = 0.0
-        else
-          S_wc1(j,l) = W_c1(i,t,j,l) / Wmax
-          S_wc1(j,l) = max(0.0, min(1.0, S_wc1(j,l)))
-        endif
-
-        if (S_wc1(j,l) .ne. S_wc1(j,l)) then
-          write(*,*) "FATAL: S_wc1 is NaN in unfrozen nova_step"
-          write(*,*) "rank=", rank, " i=", i, " t=", t, " j=", j, " l=", l
-          write(*,*) "W_c1=", W_c1(i,t,j,l), " Wmax=", Wmax
-        endif
-
-        if (W_c1(i,t,j,l) .lt. wlim .or. S_wc1(j,l) .lt. wlim) then
-          Q_Per1 = 0.0
-        else
-          Q_Per1 = Qp0 * S_wc1(j,l) * p_dt
-          Q_Per1 = max(0.0, min(Q_Per1, W_c1(i,t,j,l)))
-        endif
-        W_c1(i,t,j,l) = W_c1(i,t,j,l) - Q_Per1
-        W_c1(i,t,j,l) = max(0.0, min(W_c1(i,t,j,l), Wmax))
-
-        if (sum(Br(i,j,:)) .gt. p_critD) then
-          QR1(i,t,j,l) = min(max(0.0, QRpot) * Br(i,j,l) / sum(Br(i,j,:)), W_c1(i,t,j,l))
-        else
-          QR1(i,t,j,l) = 0.0
-        endif
-
-        W_c1(i,t,j,l) = W_c1(i,t,j,l) - QR1(i,t,j,l)
-        W_c1(i,t,j,l) = max(0.0, min(W_c1(i,t,j,l), Wmax))
-
-        S_wc1(j,l) = W_c1(i,t,j,l) / Wmax
-        S_wc1(j,l) = max(0.0, min(1.0, S_wc1(j,l)))
-
-        QRpot = max(0.0, QRpot - QR1(i,t,j,l))
-
-        nfd(j) = nfd(j) + 1.0
-        if (S_wc1(j,l) .lt. 0.01) MD0(j) = MD0(j) + 1
-
-      enddo
-      fH2Olg_xu(j) = sum(QR1(i,t,j,:))
-      Layer_con(j)= sum(S_wc1(j,:))/(nsoil)
-      mon_cond(i,j)=mon_cond(i,j) + Layer_con(j)
-
-      counttimer(j)=counttimer(j)+1
-      
-      Wx1(i,t,j) = Wx1(i,t,j) + (Q_Per1 + Q_Oflow1)
-      if (Wx1(i,t,j) .lt. wlim) Wx1(i,t,j) = 0.0
-      Overflow = max(0.0, Wx1(i,t,j) - Wxmax)
-      Wx1(i,t,j) = Wx1(i,t,j) - Overflow
-      if (Wx1(i,t,j) .lt. wlim) Wx1(i,t,j) = 0.0
-      S2(j) = max(0.0, min(1.0, Wx1(i,t,j) / Wxmax))
-
-      Q_base1(i,t,j) = min(Qb0 * S2(j) * p_dt, Wx1(i,t,j))
-      Wx1(i,t,j) = Wx1(i,t,j) - Q_base1(i,t,j)
-      if (Wx1(i,t,j) .lt. wlim) Wx1(i,t,j) = 0.0
-
-      if (S2(j) .gt. 1.0) then
-        write(*,*) "The Soil saturation level(bucket) is more than 1 at", i
-      endif       
-       
-      Runoff1(i,t,j)=Q_base1(i,t,j) + Overflow !!THis needs to declared universally available
-        
-      fH2Ol_xd(j)=fH2Ol_xd(j)+max(0.0,Runoff1(i,t,j)) 
-        
-        
-    endif
-    !write(*,*) "Wet_temp is", xT_s_wet
-    !write(*,*) "dry_temp is", xT_s_dry
-     
-    if (xT_s_dry .le. c_TH2Osl-5.0) then
-      xT_s(j) = xT_s_dry
-    else
-      xT_s(j) = max(1.0, wetfrac * xT_s_wet + (1.0 - wetfrac) * xT_s_dry)
-    endif
-    !write (*,*) 'xT_s is',xT_s(j)
-    !write (*,*) 'wetfrac    ', wetfrac
-    !write (*,*) "fRAD_Hd IS", fRAD_Hd
-    fRAD_H(j)                 = wetfrac*fRAD_Hw + (1.0-wetfrac)*fRAD_Hd
-
-    fQ_ta_L(j)                = fH2Olg_xu(j) * c_HH2Olg * c_rhoH2Ol   ! Latent heat flux [W / m2 T]
-    !fQ_ta_L(j)                = fH2Olg_ga(j) * c_HH2Olg * c_rhoH2Ol   ! Latent heat flux [W / m2 T]     !!!!!!!check etact 
-
-
-      ! Sensible heat
-    fQ_ta_S(j)                = c_CAIR * (xT_s_wet - xT_a(i)) &       ! Sensible heat flux [W / m2 T]
-                                * kH2Og * wetfrac &
-                                + c_CAIR * (xT_s_dry - xT_a(i)) &
-                                * kH2Og * (1.0 - wetfrac)
-!!!!!!THE SENSIBLE AND GROUND HEAT NEEDS CORRECTION!!!!!
-! Ground heat
-    fQ_tg(j)                    = kSOIL(i) * (xT_s(j) - xT_g(i,t,j))& ! Ground heat flux [W / m2 T]
-                                / p_dz_SOIL * lground
-
-    ! Heat balance
-    xT_g(i,t,j)               = xT_g(i,t,j) &
-                                + fQ_tg(j) /CSOIL(i) /p_dz_SOIL * p_dt   ! balance of ground heat reservoir [K]
-    !write (*,*) "The productivity calculation starts here"
-    !write (*,*) "crgas is ", c_Rgas
-    if (gS .gt. p_critD) then
-
-      KcfT  = exp(max((xT_s(j) - o_ToptP(j)) &          ! temperature response of Michaelis-Menten-Constant []                  REF: Medlyn,2002
-                * o_Eact_Kc(j) / (o_ToptP(j) * c_Rgas * xT_s(j)), 0.0))
-      !write (*,*) "The KcfT calculation done", KcfT   
-      !write (*,*) "The KcfT", KcfT                 
-      KofT                       = exp(max((xT_s(j) - o_ToptP(j)) &          ! temperature response of Michaelis-Menten-Constant []                  REF: Medlyn,2002
-                                * o_Eact_Ko(j) &
-                                / (o_ToptP(j) * c_Rgas * xT_s(j)), 0.0))
-      !write (*,*) "The KofT", KofT
-      VmfT                        = exp(max((xT_s(j) - o_ToptP(j)) &          ! temperature response of Michaelis-Menten-Constant []                  REF: Medlyn,2002
-                                * o_Eact_Vm(j) &
-                                / (o_ToptP(j) * c_Rgas * xT_s(j)), 0.0))
-      !write (*,*) "The VmfT", VmfT                          
-      JmfT                        = exp(max((xT_s(j) - 298.15) &              ! temperature response of Michaelis-Menten-Constant []                  REF: Medlyn,2002
-                                * o_Eact_Jm(j) &
-                                / (xT_s(j) * c_Rgas * 298.15), 0.0))
-      !write (*,*) "The JmfT", JmfT
-      vcmaxTo                     = o_vcmax_M(j) * o_RubConc(j)      ! vcmax [mol / (m2 T * s)] *** at T opt ***      !!!!!!SHOULD WE USE O_Rubconc(j) instead!!!! NEED TO CLARIFY- DIFFERENT IN lycom AND LYCOM
-      !write (*,*) "The vcmaxTo", vcmaxTo                          
-      vcmax(j)                    = vcmaxTo * VmfT                        ! vcmax at current Ts
-      !write (*,*) "The vcmax", vcmax(j)                          
-      vcmax25                     = vcmaxTo*exp(max(0.0, (298.15 - o_ToptP(j))) &   ! vcmax at standard temperature
-                                * o_Eact_Ko(j) &
-                                / (o_ToptP(j) * c_Rgas * 298.15))
-      !write (*,*) "The vcmax25", vcmax25
-      jmax(j)                     = vcmax25 * 2.1 * JmfT                  ! jmax [mol / (m2 T * s)] at current Ts                                 REF: Wullschleger,1993
-      !write (*,*) "The jmax", jmax(j)                          
-      !commented recently !KcM                         = p_KcM1 * o_vcmax_M(j)**p_KcM2         ! Michaelis-Menten-Constant for CO2 [muM]                               REF: Savir,2009
-      !!write (*,*) "The kcM", KcM                          
-      !commented recently ! KoM                         = o_vomax_M(j) / (p_KoM1 &              ! Michaelis-Menten-Constant for O2 [muM]                                REF: Savir,2009
-                                         !* (o_vcmax_M(j) / KcM)**p_KoM2)
-      !!write (*,*) "The koM", KoM                          
-      Kc                          = p_KcM1 * o_vcmax_M(j)**p_KcM2 * 0.001 * KcfT      !KcM * 0.001 * KcfT                    ! temperature correction [mol / m3]
-      !write (*,*) "The kc", Kc 
-      !write (*,*) "The vcmM is",o_vcmax_M(j)                         
-      Ko                          = o_vomax_M(j) / (p_KoM1*(o_vcmax_M(j)/(p_KcM1*o_vcmax_M(j)**p_KcM2))**p_KoM2)*0.001*KofT    !KoM * 0.001 * KofT                    ! temperature correction [mol / m3]
-      !write (*,*) "The ko", Ko
-
-!!!!!!!!!!!!!!!
-
-      Ix     			= cpar * fRADs_ad(i) * fracRADs * o_fracTransm(j)
-      !write (*,*) "Ix", Ix
-      Jo     			= jmax(j)*Ix*o_X(j) / (2.1*jmax(j) + Ix)
-      !write (*,*) "Jo", Jo
-      Rspec(j)                       = o_resp_main(j) &   ! [mol / (m2 T * s)]            REF: Kruse,2010
-                                            * o_Q10_resp(j) &
-                                            **((xT_s(j) - o_ToptP(j)) / 10.0)
-      fCcg_M(j) = Rspec(j)
-
-      sO2   			= 0.00126*exp(1700.0*(1.0/xT_s(j) - 1.0/298.15))
-      sCO2  			= 0.0334*exp(2400.0*(1.0/xT_s(j) - 1.0/298.15))
-      P     			= 0.5*rO2g_a/1.0E6*sO2*1000.0*o_vomax_M(j)/ o_vcmax_M(j) * Kc/Ko
-      
-
-! %%%% light-limited rate
-     
-      a     = -4.5 * gS / (sCO2 * 1000)
-      
-      b     = gS * (4.5 * rCO2g_a /1.0e6 - 10.5 * P / (sCO2 *1000)) - Jo + 4.5 * Rspec(j)
-      d     = P * (10.5 * gS * rCO2g_a /1.0e6 + Jo + 10.5 * Rspec(j) )
-      if (abs(a) .gt. p_critD) then
-        xl = (-b - sqrt(max(0.0, b**2 - 4.0*a*d))) / (2.0*a)
-      else
-        xl = P
-      endif
-      Al    = (Jo * (xl - P) / (4.5* xl + 10.5*P) -Rspec(j))
-
-                  
-      Al_r  = (Jo * (xl - P) / (4.5* xl + 10.5*P))
-      fCO2gc_L(j)=Al_r
-
-!      %%%% CO2-limited rate
-     
-      a     = -gS / (sCO2 * 1000)
-      K     = Kc * (1.0 + rO2g_a /1.0E6 *sO2*1000.0 / Ko)
-      b     = gS * (rCO2g_a /1.0e6 - K / (sCO2 *1000)) - vcmax(j) + Rspec(j)
-      d     = (gS * rCO2g_a /1.0e6 + Rspec(j))*K + P*vcmax(j)
-      if (abs(a) .gt. p_critD) then
-        xc = (-b - sqrt(max(0.0, b**2 - 4.0*a*d))) / (2.0*a)
-      else
-        xc = P
-      endif
-      !write (*,*) "The xc", xc
-      Ac    = ((vcmax(j) * (xc-P) / (xc + Kc*(1.0 + rO2g_a /1.0e6 * sO2 *1000  / Ko)) -Rspec(j)))
-      !write (*,*) "The productivity Carbon calculation is", Ac
-     
-      Ac_r  = (vcmax(j) * (xc-P) / (xc + Kc*(1.0 + rO2g_a /1.0e6 * sO2 *1000  / Ko)))
-      !write (*,*) "The productivity carbon calculation GPP is", Ac_r
-      fCO2gc_W(j)=Ac_r
-    else
-       ! Acs=Acs+1.0 commented out
-      Ac_r= 0.0
-      Al_r = 0.0
-      Al=0.0
-      Ac=0.0 
-      Rspec(j)= 0.0
-      fCcg_M(j)= 0.0
-
-        !Rspec(j)                       = o_resp_main(j) &                      ! [mol / (m2 T * s)]                                                    REF: Kruse,2010
-         !                                   * o_Q10_resp(j) &
-          !                                  **((xT_s(j) - o_ToptP(j)) / 10.0)
-          !                                  !NEW COMMENTED
-
-      fCO2gc_L(j) = 0.0
-      fQ_tg(j)                    = kSOIL(i) * (xT_s(j) - xT_g(i,t,j))& ! Ground heat flux [W / m2 T]
-                                / p_dz_SOIL * lground
-
-
-      xT_g(i,t,j)               = xT_g(i,t,j) &
-                                + fQ_tg(j) /CSOIL(i) /p_dz_SOIL * p_dt 
-      fCO2gc_W(j) = 0.0
-    endif
-     
-    !write (*,*) "i value", i
-
-    if (Al .lt. Ac) then
-      
-      
-      fCO2gc(i,j)             = Al_r 
-      fCO2nc(i,j)             =Al 
-        
-      Als(i,j)                   =Als(i,j) +1.0
-    else
-      
-      fCO2gc(i,j)             =Ac_r 
-      fCO2nc(i,j) 	          = Ac 
-      Acs(i,j)                   =Acs(i,j) +1.0
-      
-      if (Al .eq. Ac) then
-        Acs(i,j)=Acs(i,j)+0.5!(Because 1 is already added before Acs=Acs-1+0.5)
-        Als(i,j)=Als(i,j)+0.5
-      endif
-    endif
-    fCcb(j) = fCO2nc(i,j)
-    bsum(i,j)                        =(Bl(i,j) +sum(Br(i,j,:)))
-
-    M0(i,j)                          = M0(i,j) + kmrt0* bsum(i,j)
-
-      
-    
-    gpp0(i,j) = gpp0(i,j) + fCO2gc(i,j) 
-    npp0(i,j) = npp0(i,j)+ fCO2nc(i,j)
-    !if (accts .gt. 262750) then
-      !write(*,*) "The time in this case is", accts
-      !write (*,*) "The location for the print is", i
-      !write (*,*) "The productivity end is reached and GPP is", fCO2gc(i,j)
-      !write (*,*) "The productivity cumulative NPP is", npp0(i,j)
-    !endif
-!REMOVED fccb    fCcb(j)                   = gpp0(j) - (fCcg_M(j)*p_dt* c_MCo2)          ! NPP [mol / (m2 T * s)]
-!    write(*,*) "fCcb value is ", fCcb(j)
-!    if (fCcb(j) .gt. 0.0) fCcb(j) = fCcb(j) * Ngrow ! growth efficiency
-   ! if (fCO2nc(j) .gt. 0.0) fCO2nc(j) = fCO2nc(j) * Ngrow
-
-!    netgrowth(i,t,j)= netgrowth(i,t,j)+(fCO2nc(j)*p_dt)*o_spec_area(j)*c_MCo2
-    netgrowth(i,t,j)   =  netgrowth(i,t,j)  &                ! [1 / month]
-                          + (fCO2nc(i,j) * p_dt) &
-                          * o_spec_area(j) * c_MCo2
-                          
-    csum(i) = csum(i) + area_s(i,t,j)
-    Lai_cum(i) = Lai_cum(i) +Lai_new(i,j) 
-    if (csum(i) .gt. 1.0)then
-      write(*,*) "csum got Rogue" 
-    endif
-  else
-    !write (*,*) "The Klife is changed to 0. THe species dies"
-    klife(i,t,j)=0.0
-    area_s(i,t,j)   = 0.0
-    netgrowth(i,t,j)= 0.0
-    fCO2gc(i,j)     = 0.0
-    fCO2nc(i,j)     = 0.0
-  endif  !klife!
-  !write (*,*) "Species number ", j
-  !write (*,*) "i value", i
-  !write (*,*) "t", t
-enddo  
-
-!-----------------------------------------------------------------------
-! Execute once per month
-!-----------------------------------------------------------------------
-if (day .eq. dpm .and. ts .eq. tspd) then
-    !write(*,*) "Entering month wise Calculations" 
-  do j = 1,p_nspec !
-    if (Klife(i,t,j) .ne. 0.0) then
-    !bsum(j)                        =(Bl(j) +sum(Br(j,:)))
-
-    !M0(j)                          = M0(j) + kMrt0* bsum(j)*dpm*tspd
-      npp0(i,j) = npp0(i,j) * c_MCo2 * Ngrow * p_dt
-
-      gpp0(i,j) = gpp0(i,j) * c_MCo2 * p_dt
-
-      if (Als(i,j)+Acs(i,j) .le. 0.0) then
-    
-        fracL=0.5
-      else
-        fracL = Als(i,j) /(Als(i,j)+Acs(i,j))
-
-      endif
-    !write (*,*)"Als is", Als(j)
-    !write (*,*)"Als is", Acs(j)
-  
-    !if (SS(j) .le. 0.15) then
-    !  fracL=0.3
-    !endif  
-      if (fracL .eq. 1.0) then
-        fracL=0.8
-      endif
-      if (fracL .le. 0.0) then
-        fracL=0.2
-      endif
-    
-    !write (*,*) "The species number placed here is:", j
-
-    !write(*,*) "Monthly package is entered"
-!!!!! Disturbance and retreat meaning
-!This might be done in the next part
-      Mrt(j)  = min(bsum(i,j),max(M0(i,j) * p_dt, bsum(i,j) * MD0(j)/max(p_critD,nfd(j))))
-      do l =1,nsoil
-        if (l .eq. 1) then
-          Bin =npp0(i,j) * (1-fracL)
-        else
-          Bin = Bout
-        endif
-        Br(i,j,l) =Br(i,j,l) + fracR0*Bin - Mrt(j)* Br(i,j,l)/max(p_critD, bsum(i,j))
-        RtoM(i,j) =RtoM(i,j) + max(0.0, Br(i,j,l) - (Brmax*1000) )
-        Total_mortality_root(i,j)=Total_mortality_root(i,j)+Mrt(j)*Br(i,j,l)/max(p_critD,bsum(i,j))+RtoM(i,j)
-        Bout=(1-fracR0)*Bin
-  !!write (*,*) "Frac root layer wise", fracL
-      enddo
-   ! write (*,*) "RtoM is", RtoM(J)
-      Mrt(j) = Mrt(j) +RtoM(i,j)
-    
-      Rtb(i,j)	=sum(Br(i,j,:))    
-      if (Rtb(i,j) .eq. 0.0) then
-        Rtres(i,j)=Rtres(i,j)+0
-      else
-        do l =1,nsoil
-        
-          Rtres_l(j) = Rspec(j) * o_Q10_resp(j)**((xT_s(j) - o_ToptP(j)) / 10.0 ) * c_MCo2 * p_dt* Br(i,j,l)/Rtb(i,j)  !*c_MCo2
-          Br(i,j,l) = Br(i,j,l) - Rtres_l(j)
-          Rtres(i,j)=Rtres(i,j) + Rtres_l(j)
-        enddo
-      endif
-    
-    
-      Bl(i,j)= Bl(i,j)+ npp0(i,j)*fracL- Mrt(j)*Bl(i,j)/max(p_critD, bsum(i,j))
-      Rtb(i,j) = sum(Br(i,j,:))
-     
-      Mrt_tot(i,j) = Mrt(j)*Bl(i,j)/max(p_critD, bsum(i,j))+Rtres(i,j)+Total_mortality_root(i,j)     !total dead matter in soil
-      if (klife(i,t,j) .eq. 1 )then
-
-        M_cond(j)=mon_cond(i,j)/real(max(1, counttimer(j)))
-        res_por(j)=por*(1-M_cond(j))
-        if (res_por(j) .gt. 1.0) then
-          write (*,*) "The remaining porosity is more than 1 "
-        endif
-        if (res_por(j) .le. 0) then
-          res_por(j)=0.1
-        endif
-      endif
-      hmon=24*30.5
-      if (klife(i,t,j) .eq. 1.0) then
-
-        CO2_sink(i,j)=max(rCO2g_a, &
-                (((Mrt_tot(i,j)*1000)*0.15/(0.66*res_por(j)*0.05*dpm*tspd)) &
-                *22.71108/44)+((CO2_pre(i,j)*1.94)*0.15/(0.66*res_por(j)*0.05*dpm*tspd)*22.71108/44)+rCO2g_a )
-      
-      else
-        CO2_sink(i,j)= max(rCO2g_a, CO2_sink(i,j)+0.0 )
-      endif
-    
-      CO2_pre(i,j)=max(rCO2g_a, CO2_sink(i,j)) 
-    
-      Rtres(i,j)=0.0
-    
-      Als(i,j)=0.0
-      Acs(i,j)=0.0
-    
-      N_leaf(j)=0.7*Bl(i,j)/o_w_leaf(j)
-      htree(j)=0.3*Bl(i,j)/(p_rhoBl*1.5)/(pi*rstem*rstem)        !height of tree, density of tree 1.5 times that of leaf
-      if (klife(i,t,j) .eq. 1.0)then
-        Lai_new(i,j)=o_A_leaf(j)*N_leaf(j)/o_G_area(j)
-        kcccc=kcccc + 1
-      else
-        Lai_new(i,j) = 0.001
-      endif
-
-    
-      nfd(j)=0.0
-      MD0(j)=0.0
-      M0(i,j)=0.0
-      Mrt(j)=0.0
-      RtoM(i,j)=0.0
-      Total_mortality_root(i,j)=0.0
-      Run_tot(i,t,j)=Run_tot(i,t,j) + max(0.0,fH2Ol_xd(j))
-      mon_cond(i,j)=0.0
-      counttimer(j)=1
-    endif
-  enddo
-  csum_area = sum(area_s(i,t,:))
-  if (csum_area .gt. 1.0) then
-    area_s(i,t,:) = area_s(i,t,:) / csum_area
-  endif
-  ngsum=0.0
-  do m = 1,p_nspec
-    if (klife(i,t,m) .eq. 1.0) ngsum=ngsum +max(0.0, netgrowth(i,t,m))
-      
-  enddo
-  if (ngsum .gt. p_critD) then
-
-    wgtsum                      = 0.0
-
-    do j = 1,p_nspec
-      
-      if (klife(i,t,j) .eq. 1.0) then
-
-!        wgtspec(j)              = 1.0 &                                 ! equal weights at low cover (no competition)
-!                                * ( (o_zt(j)/hsum)**csum )**1           ! competition under low disturbance -> weighting by growth height
-
-
-        wgtspec(j)              = 1.0 &                                 ! equal weights at low cover (no competition)
-                                * ( ( max(0.0,netgrowth(i,t,j)) &                                 
-                                / ngsum )**csum_area )**2                    ! competition under low disturbance -> weighting by net growth    !May be keep it or use "LAI"
-
-!        wgtspec(j)              = 1.0                                   ! equal weights (neutral model)
-
-        wgtsum                  = wgtsum + wgtspec(j)
-      endif
-    enddo ! End of loop over all species - IIb -
-     
-! Start loop over all species - IIc -
- 
-    do j = 1,p_nspec
-
-      if (klife(i,t,j) .eq. 1.0) then
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!**********!!!!!!!!!!!!!!***********
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!******
-        expansion(j)       = max(0.0, min( &                       ! [m2 T / m2 V / month]
-                                  netgrowth(i,t,j) *area_s(i,t,j), & ! mass balance constraint
-                                  max(0.0,(1.0 - csum_area)) &                        ! available area
-                                * p_NCbt &                              ! establishment
-                                * wgtspec(j) /max(p_critD,wgtsum)) )                 ! competition                                          !!must decide
-
-      else
-
-        expansion(j)       = 0.0
-      endif
-    enddo
-  else
-    expansion(:)           =0.0
-  endif
-  expsum                        = sum(expansion(:))
-  if (expsum .gt. p_critD) then
-    !must decide
-    expansion(:)                = expansion(:) * min(1.0, &       !!!!must decide
-                                  max(0.0, (1.0-csum_area)) / expsum)
-  else
-    expansion(:)                = 0.0
-  endif
-
-  !write (*,*) "Species ending here is", j
-   
-!-----------------------------------------------------------------------
-! Start loop over all species - III -
-!-----------------------------------------------------------------------
-
-
-  do j = 1,p_nspec !-III
-
-
-    if (klife(i,t,j) .eq. 1.0) then
-
-! *** Cover change II ***
-
-! *** Cover change II ***
-
-      !retreat                   = min( max(0.0, - netgrowth(i,t,j)) &   ! [m2 T / m2 V / month]
-       !                         * area_s(i,t,j), &
-        !                          area_s(i,t,j) )
-                            
-!      disturbance               = 1.0/tauD(i,t,v,h) * area_s(i,t,j)  ! [m2 T / m2 V / month]  This one may be used later
-                              
-      area_s(i,t,j)       = max(0.0, area_s(i,t,j) &           ! [m2 T / m2 V]
-                                + expansion(j))! &
-                                !- retreat )                  !- disturbance &  retreat removed 
-                                
-                                
-      netgrowth(i,t,j)      = 0.0
-
-      if (area_s(i,t,j) .gt. 1.0) then
-
-        write(*,*) "Invalid area "
-
-      endif 
-      
-
-
-
-      if (area_s(i,t,j) .le. frac_s_crit) then
-
-        klife(i,t,j)        = 0.0
-        area_s(i,t,j)     = 0.0
-
-      endif 
-      if (sum(area_s(i,t,:)) .gt. 1.0) then
-
-        write(*,*) "Invalid areasum "
-
-      endif 
-
-
-! Set lichen to dead if cover is too low
-
-    endif ! check for survival
-
-  enddo ! End of loop over all species - III -
-  csum_area = sum(area_s(i,t,:))
-  if (csum_area .gt. 1.0) then
-    area_s(i,t,:) = area_s(i,t,:) / csum_area
-  endif
-endif ! End of execute once per month
-
-!write (*,*) "LYcophyte_nova_crucial calculátions in lycophytes: is close to end"
-
-
-! *** Average strategies ***
-!enddo
 csum(i)    = 0.0
 Lai_cum(i) = 0.0
-do j = 1, p_nspec
-  if (klife(i,t,j) .eq. 1.0) then
-    csum(i)    = csum(i) + area_s(i,t,j)
-    Lai_cum(i) = Lai_cum(i) + Lai_new(i,j)
-  endif
-enddo
-as_lai_s                        = Lai_cum(i) !new var
-as_area_s                       = csum(i) ! total area of all strategies
-
-!if (as_area_s .gt. max_area_grid)then
-!  as_area_s=  0.4
-!else
-!  as_area_s= csum/max_area_grid
-!endif
-if (writeout) then
-
-  ! initialise accumulated variables with zero
-  as_rCO2d                      = 0.0
-  as_sCO2d                      = 0.0
-  as_rCb                        = 0.0
-  as_Lai                        = 0.0
-  as_fCO2gc                     = 0.0
-  as_fCcg                       = 0.0
-  as_fCcb                       = 0.0
-  as_fCcb_l                     = 0.0
-  as_fCcb_c                     = 0.0
-  as_fCbo                       = 0.0
-  as_fH2Ogl_ut                  = 0.0
-  as_fH2Olg_tu                  = 0.0
-  
-  as_fH2Ol_lsat                 = 0.0 !new var
-  as_fH2Ol_bsat                 = 0.0 !new var
-  as_fH2Ol_runoff_l             = 0.0
-  as_fCc_npp             = 0.0
-  as_fCc_gpp             = 0.0
-  as_rH2Ol_t                    = 0.0
-  as_rmaxH2Ol_t                 = 0.0
-  as_Ts                         = 0.0
-  as_Tg                         = 0.0
-  as_H                          = 0.0
-  as_G                          = 0.0
-  as_E                          = 0.0
-  as_C                          = 0.0
-  as_EB                         = 0.0
-endif
-! loop over all strategies
-do j = 1,p_nspec
-
-  as_npp(j)=npp0(i,j)
-  as_gpp(j)=gpp0(i,j)
-    
-  if (klife(i,t,j) .eq. 1.0) then
-    as_fH2Ol_td(j) = Runoff1(i,t,j)
-  else
-    as_fH2Ol_td(j) = 0.0
-  endif
-  ! Check if lichen is alive
-  if (day .eq. dpm .and. ts .eq. tspd) then
-    
-    Run_tot(i,t,j) = 0.0 
-    fH2Ol_xd(j)=0.0
-    npp0(i,j)=0.0
-    gpp0(i,j)=0.0
-  endif
-enddo
-
-!write (*,*) "LYcophyte_nova_crucial calculátions in lycophytes: is ending and the file writing will be started"
-
-!-----------------------------------------------------------------------
-! Start loop over all species - V -
-!-----------------------------------------------------------------------
+as_lai_s   = 0.0
+as_area_s  = 0.0
 
 if (writeout) then
-  tim = tim + 1
-  !write (*,*) "enters writeout section and tim is", tim
-  ! loop over all strategies
-  do j = 1,p_nspec
-   
-    ! Check if lichen is alive
-   
-    if (klife(i,t,j) .eq. 1.0) then
-      cweight = area_s(i,t,j) / max(p_critD, csum(i))
-      lweight = Lai_new(i,j) / max(p_critD, Lai_cum(i))
-      !write(*,*) "The LAI weight is ", lweight
-      if (tim .eq. simhour ) then
-      endif
-      ! intensive variables are weighted by cover   !STILL I USE AREA BUT LATER MAY BE CHANGE TO lai
-   
-      
-      as_rCO2d                  = as_rCO2d + Mrt_tot(i,j) *cweight
-
-      as_sCO2d                  = as_sCO2d + CO2_pre(i,j) * area_s(i,t,j)
-      as_Lai                    = as_Lai + Lai_new(i,j)  * area_s(i,t,j)
-      as_rCb                    = as_rCb + o_spec_area(j) *area_s(i,t,j)
-
-
-      as_fH2Ol_lsat             = as_fH2Ol_lsat  + Layer_con(j) *area_s(i,t,j) !new var         **********WEIGHTING SCHEME***THINK ABOUT IT
- 
-      as_fH2Ol_bsat             = as_fH2Ol_bsat  + S2(j) *area_s(i,t,j) !new var                **********WEIGHTING SCHEME***THINK ABOUT IT
-      
-      as_fH2Ol_runoff_l         = as_fH2Ol_runoff_l + as_fH2Ol_td(j)*cweight!area_s(i,t,j)
-      
-      as_fCc_npp                = as_fCc_npp + fCO2nc(i,j)*area_s(i,t,j)
-      as_fCc_gpp                = as_fCc_gpp + fCO2gc(i,j)*area_s(i,t,j)
-      as_rH2Ol_t                = as_rH2Ol_t   + Layer_con(j) *area_s(i,t,j)
-      as_rmaxH2Ol_t             = as_rmaxH2Ol_t + S2(j)       *area_s(i,t,j)
-                                    
-      as_fCO2gc                 = as_fCO2gc + fCO2gc(i,j) *area_s(i,t,j)
-                                
-      as_fCcg                   = as_fCcg + (Rspec(j)) *c_MCo2 * p_dt *area_s(i,t,j)
-                                
-      as_fCcb                   = as_fCcb + fCcb(j) *area_s(i,t,j)
-
-      as_fCcb_l                 = as_fCcb_l + (fCO2gc_L(j)-fCcg_M(j))  *area_s(i,t,j)
-                                
-      as_fCcb_c                 = as_fCcb_c + (fCO2gc_W(j)-fCcg_M(j))  *area_s(i,t,j)
-
-      as_fCbo                   = as_fCbo + fCbo(j) *area_s(i,t,j)
-
-      !as_fH2Ogl_ut              = as_fH2Ogl_ut + min(0.0,fH2Olg_ga(j))  *area_s(i,t,j)
-                                
-      !as_fH2Olg_tu              = as_fH2Olg_tu + max(0.0,fH2Olg_ga(j))  *area_s(i,t,j)
-
-      as_Ts                     = as_Ts + xT_s(j) *cweight
-   
-      as_Tg                     = as_Tg + xT_g(i,t,j) *lground *cweight
-   
-      as_H                      = as_H + fRAD_H(j) *area_s(i,t,j)
-   
-      as_G                      = as_G + fQ_tg(j) *area_s(i,t,j)
-   
-      as_E                      = as_E + fQ_ta_L(j) *area_s(i,t,j)
-   
-      as_C                      = as_C + fQ_ta_S(j) *area_s(i,t,j)
-   
-      as_EB                     = as_EB + (fRAD_H(j)-fQ_ta_L(j)-fQ_ta_S(j)) *area_s(i,t,j)
-   
-      ! average BSC-related properties
-   
-      !     if (i2 .eq. 1 .and. BSCtypes) call lycom_accBSC(i,i2,j)
-   
-      endif ! check for survival
-   
-  enddo ! End of loop over all species - VI -
-  
-  
+  as_rCO2d          = 0.0
+  as_sCO2d          = 0.0
+  as_rCb            = 0.0
+  as_Lai            = 0.0
+  as_fCO2gc         = 0.0
+  as_fCcg           = 0.0
+  as_fCcb           = 0.0
+  as_fCcb_l         = 0.0
+  as_fCcb_c         = 0.0
+  as_fCbo           = 0.0
+  as_fH2Ol_lsat     = 0.0
+  as_fH2Ol_bsat     = 0.0
+  as_fH2Ol_runoff_l = 0.0
+  as_fCc_npp        = 0.0
+  as_fCc_gpp        = 0.0
+  as_rH2Ol_t        = 0.0
+  as_rmaxH2Ol_t     = 0.0
+  as_Ts             = 0.0
+  as_Tg             = 0.0
+  as_H              = 0.0
+  as_G              = 0.0
+  as_E              = 0.0
+  as_C              = 0.0
+  as_EB             = 0.0
 endif
+fH2Ol_ci1(i,t) = 0.0
+fH2Ol_ux1(i,t) = 0.0
 return
 end subroutine nova_step
 
