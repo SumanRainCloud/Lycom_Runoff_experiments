@@ -8,21 +8,78 @@ contains
 
 ! CHECK STATUS
 !---------------------------------------------------------------
-
 subroutine check(status)
-use netcdf
+  use netcdf
+  implicit none
 
   integer, intent(in) :: status
-                     
-  if(status /= nf90_noerr) then
+
+  if (status /= nf90_noerr) then
     print *, trim(nf90_strerror(status))
     stop 2
   end if
-
 end subroutine check
 
-end module lycom_nc
 
+subroutine dump_netcdf_info(filename)
+  use netcdf
+  implicit none
+
+  character(len=*), intent(in) :: filename
+  integer :: ncid, ndims, nvars, ngatts, unlimdimid
+  integer :: i, j, xtype, vndims, natts
+  integer :: dimids(NF90_MAX_VAR_DIMS), dimlen
+  character(len=NF90_MAX_NAME) :: name, dname
+
+  call check(nf90_open(trim(filename), nf90_nowrite, ncid))
+  call check(nf90_inquire(ncid, ndims, nvars, ngatts, unlimdimid))
+
+  write(*,*) "========================================"
+  write(*,*) "FILE: ", trim(filename)
+  write(*,*) "ndims=", ndims, " nvars=", nvars, " ngatts=", ngatts, " unlimdimid=", unlimdimid
+
+  write(*,*) "---- DIMENSIONS ----"
+  do i = 1, ndims
+    call check(nf90_inquire_dimension(ncid, i, name, dimlen))
+    write(*,*) "dim", i, " name=", trim(name), " len=", dimlen
+  end do
+
+  write(*,*) "---- VARIABLES ----"
+  do i = 1, nvars
+    call check(nf90_inquire_variable(ncid, i, name, xtype, vndims, dimids, natts))
+    write(*,*) "var", i, " name=", trim(name), " xtype=", xtype, " ndims=", vndims
+    do j = 1, vndims
+      call check(nf90_inquire_dimension(ncid, dimids(j), dname, dimlen))
+      write(*,*) "   uses dim", j, ": ", trim(dname), " len=", dimlen, " dimid=", dimids(j)
+    end do
+  end do
+
+  call check(nf90_close(ncid))
+  write(*,*) "========================================"
+end subroutine dump_netcdf_info
+
+
+subroutine dump_var_info(ncid, vname)
+  use netcdf
+  implicit none
+
+  integer, intent(in) :: ncid
+  character(len=*), intent(in) :: vname
+  integer :: varid, xtype, ndims, natts, i, dimlen
+  integer :: dimids(NF90_MAX_VAR_DIMS)
+  character(len=NF90_MAX_NAME) :: dname
+
+  call check(nf90_inq_varid(ncid, trim(vname), varid))
+  call check(nf90_inquire_variable(ncid, varid, xtype=xtype, ndims=ndims, dimids=dimids, natts=natts))
+
+  write(*,*) "VARIABLE:", trim(vname), " varid=", varid, " ndims=", ndims
+  do i = 1, ndims
+    call check(nf90_inquire_dimension(ncid, dimids(i), dname, dimlen))
+    write(*,*) "   dim", i, " = ", trim(dname), " len=", dimlen, " dimid=", dimids(i)
+  end do
+end subroutine dump_var_info
+
+end module lycom_nc
 !###############################################################
 ! lycom_GLOBAL2
 !###############################################################
@@ -42,18 +99,20 @@ implicit none
 integer, intent(in)                     :: code0
 integer, intent(out)                    :: ovID0
 character (len=8)                       :: vd0
-
+real(dp) :: fillv
+fillv = -9999.0d0
 ! Define output variables
 write(vd0,'(A4,I4)') "code",code0
-call check(nf90_def_var(outID, vd0, NF90_REAL, dimIDs3, ovID0)) ! returns outvarID
-
+call check(nf90_def_var(outID, vd0, NF90_DOUBLE, dimIDs3, ovID0)) ! returns outvarID
+call check(nf90_put_att(outID, ovID0, "_FillValue", fillv))
+call check(nf90_put_att(outID, ovID0, "missing_value", fillv))
 return
 end subroutine def_varG
 
 
 ! WRITE GLOBAL OUTPUT VARIABLES
 !---------------------------------------------------------------
-subroutine write_varG (var0, ovID1)
+subroutine write_varG (var0, ovID1, vlabel)
 use lycom_par
 use netcdf
 use lycom_nc
@@ -64,6 +123,8 @@ integer                 :: i,k,l
 integer                 :: mperr
 integer                 :: ovID1
 integer, dimension(1)   :: tcode
+character(len=*), intent(in) :: vlabel
+integer :: my_nvalid
 real(dp)                    :: test_val
 
 real(dp), dimension(pp) :: var0
@@ -76,11 +137,21 @@ allocate(var1(ppnp))
 allocate(outvarL(nland))
 allocate(outvar(nx,ny))
 
-! Clean input data
-do i = 1, pp
+my_nvalid = ppvec(rank+1)
+
+! Fill padded tail with fill value
+if (my_nvalid < pp) then
+  var0(my_nvalid+1:pp) = -9999.0d0
+endif
+
+! Check only valid local values
+do i = 1, my_nvalid
   test_val = var0(i)
-  if (test_val .ne. test_val .or. abs(test_val) .gt. 1.0e30) then
-    var0(i) = -9999.0
+  if (test_val .ne. test_val .or. abs(test_val) .gt. 1.0d20) then
+    write(*,*) "BAD LOCAL VALUE: rank=", rank, " var=", trim(vlabel), &
+               " i=", i, " value=", test_val, " tpos=", tpos
+    call flush(6)
+    stop "BAD LOCAL VALUE"
   endif
 enddo
 
@@ -100,11 +171,15 @@ if (rank .eq. 0) then
     k = k + ppvec(i)
   enddo
 
-  ! Clean outvarL
+    ! Check gathered values
   do l = 1, nland
     test_val = outvarL(l)
-    if (test_val .ne. test_val .or. abs(test_val) .gt. 1.0e30) then
-      outvarL(l) = -9999.0
+    if (test_val .ne. test_val .or. abs(test_val) .gt. 1.0d20) then
+      write(*,*) "BAD GATHERED VALUE: var=", trim(vlabel), &
+                 " l=", l, " value=", test_val, " tpos=", tpos
+      write(*,*) "  indvec1=", indvec1(l,1), indvec1(l,2)
+      call flush(6)
+      stop "BAD GATHERED VALUE"
     endif
   enddo
 
@@ -120,15 +195,26 @@ if (rank .eq. 0) then
   enddo
 
   ! Final cleanup
+    ! Check mapped output field
   do i = 1, nx
     do k = 1, ny
       test_val = outvar(i,k)
-      if (test_val .ne. test_val .or. abs(test_val) .gt. 1.0e30) then
-        outvar(i,k) = -9999.0
+      if (test_val .ne. test_val .or. abs(test_val) .gt. 1.0d20) then
+        write(*,*) "BAD OUTPUT GRID VALUE: var=", trim(vlabel), &
+                   " ix=", i, " iy=", k, " value=", test_val, " tpos=", tpos
+        call flush(6)
+        stop "BAD OUTPUT GRID VALUE"
       endif
     enddo
   enddo
-
+  if (rank .eq. 0) then
+    write(*,*) "DEBUG write_varG: var=", trim(vlabel)
+    write(*,*) "  ovID1=", ovID1
+    write(*,*) "  nx=", nx, " ny=", ny, " tpos=", tpos, " nland=", nland
+    write(*,*) "  outvar min/max=", minval(outvar), maxval(outvar)
+    write(*,*) "  indvec1(1,:)=", indvec1(1,1), indvec1(1,2)
+    write(*,*) "  indvec1(nland,:)=", indvec1(nland,1), indvec1(nland,2)
+  endif
   ! Write output variable
   call check(nf90_put_var(outID, ovID1, outvar(:,:), start = (/ 1, 1, tpos /), count = (/ nx, ny, 1 /) ))
   
@@ -196,6 +282,13 @@ character (len=20)      :: dimName, varName0
 
 ! Open land mask file and determine resolution
 call check(nf90_open(landmask, nf90_nowrite, ncID1) )
+
+if (rank .eq. 0) then
+  call dump_netcdf_info(landmask)
+  call dump_var_info(ncID1, "lon")
+  call dump_var_info(ncID1, "lat")
+  call dump_var_info(ncID1, trim(varName))
+endif
 !!!DEBUG -- TEMPORARY FIX FOR PALEO !!!
 !call check(nf90_inquire_dimension(ncID1, 1, dimName, nx) )
 !call check(nf90_inquire_dimension(ncID1, 2, dimName, ny) )
@@ -251,11 +344,29 @@ write(*,*) "varID (ypos):", varID
 write(*,*) "ypos sample:", ypos(1:min(5,ny))
 write(*,*) "reached here 2"
 
+if (rank .eq. 0) then
+  write(*,*) "DEBUG COORDS:"
+  write(*,*) "  nx=", nx, " ny=", ny
+  write(*,*) "  size(xpos)=", size(xpos)
+  write(*,*) "  size(ypos)=", size(ypos)
+  write(*,*) "  xpos first,last=", xpos(1), xpos(nx)
+  write(*,*) "  ypos first,last=", ypos(1), ypos(ny)
+endif
 
 ! Get the values of the land data and put them in lsdata
+!call check(nf90_inq_varID(ncID1, varName, varID))
+!call check(nf90_get_var(ncID1, varID, lsdata))
 call check(nf90_inq_varID(ncID1, varName, varID))
-call check(nf90_get_var(ncID1, varID, lsdata))
+call check(nf90_get_var(ncID1, varID, lsdata, &
+     start = (/ 1, 1, 1 /), count = (/ nx, ny, 1 /) ))
 call check(nf90_close(ncID1))
+
+if (rank .eq. 0) then
+  write(*,*) "DEBUG LANDMASK:"
+  write(*,*) "  min(lsdata)=", minval(lsdata)
+  write(*,*) "  max(lsdata)=", maxval(lsdata)
+  write(*,*) "  count(lsdata > 0)=", count(lsdata > 0.0)
+endif
 
 ! Open one climate data file (tair) and read length
 call check(nf90_open(tairfileG, nf90_nowrite, ncID2) )
@@ -587,7 +698,8 @@ enddo
 ! SSA
 call check(nf90_open(landmask, nf90_nowrite, ncID) )
 call check(nf90_inq_varID(ncID, varName, varID))
-call check(nf90_get_var(ncID, varID, bcdata2))
+call check(nf90_get_var(ncID, varID, bcdata2, &
+     start = (/ 1, 1, 1 /), count = (/ nx, ny, 1 /) ))
 write(*,*) "start SSA"
 !call check(nf90_get_var(ncID, varID, bcdata2, start = (/ 1, 1, 1 /), count = (/ nx, ny, 1 /) ))    !!  TEMPORARY
 
@@ -757,6 +869,9 @@ implicit none
 
 ! Open climate data files
 call check(nf90_open(tairfileG, nf90_nowrite, ncID0(1)) )
+if (rank .eq. 0) then
+  call dump_netcdf_info(tairfileG)
+endif
 call check(nf90_open(rhumfileG, nf90_nowrite, ncID0(2)) )
 call check(nf90_open(windfileG, nf90_nowrite, ncID0(3)) )
 call check(nf90_open(rainfileG, nf90_nowrite, ncID0(4)) )
@@ -946,7 +1061,11 @@ do c = 1,7
   !write(*,*) "c is",c
   call check(nf90_inq_varID(ncID0(c), varName, varID))
   call check(nf90_get_var(ncID0(c),varID,indata(:,:), start = (/ 1, 1, h /), count = (/ nx, ny, 1 /) ))
-
+  if (rank .eq. 0 .and. (tpos .eq. 1808 .or. tpos .eq. 1809)) then
+    write(*,*) "DEBUG FORCING: tpos=", tpos, " c=", c, " h=", h
+    write(*,*) "  indata(1,1)=", indata(1,1)
+    write(*,*) "  min/max indata=", minval(indata), maxval(indata)
+  endif
   !write(*,*) "indata is", indata(:,:)
   ! assign boundary condition data to list of land points
   do l = 1,nland
@@ -960,6 +1079,11 @@ do c = 1,7
         !write(*,*) "counter is", counter
     !endif 
   enddo
+  if (rank .eq. 0 .and. (tpos .eq. 1808 .or. tpos .eq. 1809)) then
+    write(*,*) "DEBUG LAND FORCING: tpos=", tpos, " c=", c
+    write(*,*) "  indataL(1)=", indataL(1)
+    write(*,*) "  min/max indataL=", minval(indataL), maxval(indataL)
+  endif
 
   ! distribute boundary condition data to processors
   k=1
@@ -1050,7 +1174,7 @@ if (rank .eq. 0) then
 
     write(*,*) "Creating output file:", trim(sfile_outputG)
     ! Create global output file
-    call check(nf90_create(sfile_outputG, NF90_CLOBBER, outID))
+    call check(nf90_create(sfile_outputG, IOR(NF90_CLOBBER, NF90_64BIT_OFFSET), outID))
     write(*,*) "Output file created with ID:", outID   
     ! Define dimensions.
     call check(nf90_def_dim(outID, "lon", nx, x_dimID))    ! returns dimID
@@ -1167,77 +1291,83 @@ if (rank .eq. 0) then
   tcode(1) = (year*100 + month)*100 + day
   call check(nf90_put_var(outID, t_varID, tcode, start = (/tpos/), count = (/1/) ))
 endif
+if (rank .eq. 0 .and. (tpos .eq. 1808 .or. tpos .eq. 1809)) then
+  write(*,*) "DEBUG CALENDAR: tpos=", tpos, " year=", year, " month=", month, " day=", day
+  write(*,*) "DEBUG OUTPUT STATE:"
+  write(*,*) "  ag_rCO2d min/max=", minval(ag_rCO2d(:,1)), maxval(ag_rCO2d(:,1))
+  write(*,*) "  ag_rCb   min/max=", minval(ag_rCb(:,1)),   maxval(ag_rCb(:,1))
+  write(*,*) "  ag_rH2Ol min/max=", minval(ag_rH2Ol(:,1)), maxval(ag_rH2Ol(:,1))
+  write(*,*) "  ag_Ts    min/max=", minval(ag_Ts(:,1)),    maxval(ag_Ts(:,1))
+  write(*,*) "  ag_E     min/max=", minval(ag_E(:,1)),     maxval(ag_E(:,1))
+endif
 ! Write output (variable, code, outfileID, dimensions)
 do k = 1,1
-  call write_varG(ag_rCO2d(:,k)     ,  outvarID(1+25*(k-1)))
-!  call write_varG(ag_sCO2d(:,k)     ,  outvarID(2+25*(k-1))) !commented out
-  call write_varG(ag_rCb(:,k)       ,  outvarID(3+25*(k-1)))
-  call write_varG(ag_rH2Ol(:,k)     ,  outvarID(4+25*(k-1)))
-  call write_varG(ag_rmaxH2Ol(:,k)  ,  outvarID(5+25*(k-1)))
-  call write_varG(ag_area_s(:,k)  ,  outvarID(6+25*(k-1)))
-  call write_varG(ag_act(:,k)       ,  outvarID(7+25*(k-1)))
-  call write_varG(ag_fCO2gc(:,k)    ,  outvarID(8+25*(k-1)))
-  call write_varG(ag_fCcg(:,k)      ,  outvarID(9+25*(k-1)))
-  call write_varG(ag_fCcb(:,k)      ,  outvarID(10+25*(k-1)))
-  call write_varG(ag_fCbo(:,k)      , outvarID(11+25*(k-1)))
-  call write_varG(ag_fH2Ol_ux(:,k)  , outvarID(12+25*(k-1)))
-  call write_varG(ag_fH2Ol_lsat(:,k), outvarID(13+25*(k-1)))
-  call write_varG(ag_fH2Ol_bsat(:,k), outvarID(14+25*(k-1)))
-  call write_varG(ag_fH2Ol_runoff_l(:,k), outvarID(15+25*(k-1)))
-  call write_varG(ag_fCc_gpp(:,k)   , outvarID(16+25*(k-1)))
-  call write_varG(ag_fCc_npp(:,k)   , outvarID(17+25*(k-1)))
-  call write_varG(ag_fH2Ol_xd(:,k)  , outvarID(18+25*(k-1)))
-  
-  call write_varG(ag_fH2Ogl_ux(:,k) , outvarID(19+25*(k-1)))
-  call write_varG(ag_fH2Olg_xu(:,k) , outvarID(20+25*(k-1)))
-  call write_varG(ag_Ts(:,k)        , outvarID(21+25*(k-1)))
-!  call write_varG(ag_Ts_N(:,k)      , outvarID(16+20*(k-1)))
-  call write_varG(ag_H(:,k)         , outvarID(22+25*(k-1)))
-  call write_varG(ag_E(:,k)         , outvarID(23+25*(k-1)))
-  call write_varG(ag_C(:,k)         , outvarID(24+25*(k-1)))
-  call write_varG(ag_EB(:,k)        , outvarID(25+25*(k-1)))
+  call write_varG(ag_rCO2d(:,k)     , outvarID(1+25*(k-1)) , "ag_rCO2d")
+  call write_varG(ag_rCb(:,k)       , outvarID(3+25*(k-1)) , "ag_rCb")
+  call write_varG(ag_rH2Ol(:,k)     , outvarID(4+25*(k-1)) , "ag_rH2Ol")
+  call write_varG(ag_rmaxH2Ol(:,k)  , outvarID(5+25*(k-1)) , "ag_rmaxH2Ol")
+  call write_varG(ag_area_s(:,k)    , outvarID(6+25*(k-1)) , "ag_area_s")
+  call write_varG(ag_act(:,k)       , outvarID(7+25*(k-1)) , "ag_act")
+  call write_varG(ag_fCO2gc(:,k)    , outvarID(8+25*(k-1)) , "ag_fCO2gc")
+  call write_varG(ag_fCcg(:,k)      , outvarID(9+25*(k-1)) , "ag_fCcg")
+  call write_varG(ag_fCcb(:,k)      , outvarID(10+25*(k-1)), "ag_fCcb")
+  call write_varG(ag_fCbo(:,k)      , outvarID(11+25*(k-1)), "ag_fCbo")
+  call write_varG(ag_fH2Ol_ux(:,k)  , outvarID(12+25*(k-1)), "ag_fH2Ol_ux")
+  call write_varG(ag_fH2Ol_lsat(:,k), outvarID(13+25*(k-1)), "ag_fH2Ol_lsat")
+  call write_varG(ag_fH2Ol_bsat(:,k), outvarID(14+25*(k-1)), "ag_fH2Ol_bsat")
+  call write_varG(ag_fH2Ol_runoff_l(:,k), outvarID(15+25*(k-1)), "ag_fH2Ol_runoff_l")
+  call write_varG(ag_fCc_gpp(:,k)   , outvarID(16+25*(k-1)), "ag_fCc_gpp")
+  call write_varG(ag_fCc_npp(:,k)   , outvarID(17+25*(k-1)), "ag_fCc_npp")
+  call write_varG(ag_fH2Ol_xd(:,k)  , outvarID(18+25*(k-1)), "ag_fH2Ol_xd")
+  call write_varG(ag_fH2Ogl_ux(:,k) , outvarID(19+25*(k-1)), "ag_fH2Ogl_ux")
+  call write_varG(ag_fH2Olg_xu(:,k) , outvarID(20+25*(k-1)), "ag_fH2Olg_xu")
+  call write_varG(ag_Ts(:,k)        , outvarID(21+25*(k-1)), "ag_Ts")
+  call write_varG(ag_H(:,k)         , outvarID(22+25*(k-1)), "ag_H")
+  call write_varG(ag_E(:,k)         , outvarID(23+25*(k-1)), "ag_E")
+  call write_varG(ag_C(:,k)         , outvarID(24+25*(k-1)), "ag_C")
+  call write_varG(ag_EB(:,k)        , outvarID(25+25*(k-1)), "ag_EB")
 enddo
-call write_varG(ag_Lai(:)             , outvarID(116))
-call write_varG(ag_sCO2d(:)           , outvarID(115))
-call write_varG(ag_rH2Ol_g1(:)        , outvarID(100))
-call write_varG(ag_rH2Ol_g2(:)        , outvarID(101))
-call write_varG(ag_rH2Os_g(:)         , outvarID(102))
-call write_varG(ag_fH2Ol_ug(:)        , outvarID(103))
-call write_varG(ag_fH2Ol_ug2(:)       , outvarID(104))
-call write_varG(ag_fH2Ol_go(:)        , outvarID(105))
-call write_varG(ag_fH2Ol_gb(:)        , outvarID(106))
-call write_varG(ag_fH2Olg_ga(:)       , outvarID(107))
-call write_varG(ag_fH2Osl_g(:)        , outvarID(108))
-call write_varG(ag_fH2Os_ad(:)        , outvarID(109))
-call write_varG(ag_fH2Ol_ad(:)        , outvarID(110))
-call write_varG(ag_xT_a(:)            , outvarID(111))
-call write_varG(ag_Tg(:)              , outvarID(112)) 
-call write_varG(ag_G(:)               , outvarID(113))
-call write_varG(ag_fRADs(:)           , outvarID(114))
+call write_varG(ag_Lai(:)       , outvarID(116), "ag_Lai")
+call write_varG(ag_sCO2d(:)     , outvarID(115), "ag_sCO2d")
+call write_varG(ag_rH2Ol_g1(:)  , outvarID(100), "ag_rH2Ol_g1")
+call write_varG(ag_rH2Ol_g2(:)  , outvarID(101), "ag_rH2Ol_g2")
+call write_varG(ag_rH2Os_g(:)   , outvarID(102), "ag_rH2Os_g")
+call write_varG(ag_fH2Ol_ug(:)  , outvarID(103), "ag_fH2Ol_ug")
+call write_varG(ag_fH2Ol_ug2(:) , outvarID(104), "ag_fH2Ol_ug2")
+call write_varG(ag_fH2Ol_go(:)  , outvarID(105), "ag_fH2Ol_go")
+call write_varG(ag_fH2Ol_gb(:)  , outvarID(106), "ag_fH2Ol_gb")
+call write_varG(ag_fH2Olg_ga(:) , outvarID(107), "ag_fH2Olg_ga")
+call write_varG(ag_fH2Osl_g(:)  , outvarID(108), "ag_fH2Osl_g")
+call write_varG(ag_fH2Os_ad(:)  , outvarID(109), "ag_fH2Os_ad")
+call write_varG(ag_fH2Ol_ad(:)  , outvarID(110), "ag_fH2Ol_ad")
+call write_varG(ag_xT_a(:)      , outvarID(111), "ag_xT_a")
+call write_varG(ag_Tg(:)        , outvarID(112), "ag_Tg")
+call write_varG(ag_G(:)         , outvarID(113), "ag_G")
+call write_varG(ag_fRADs(:)     , outvarID(114), "ag_fRADs")
 
 ! Optional output variables
 if (BSCtypes) then
-  call write_varG(a_MareaTHLC_g_S(:), outvarID2(1))                 
-  call write_varG(a_MareaTHDC_g_S(:), outvarID2(2))                 
-  call write_varG(a_MareaTHCC_g_S(:), outvarID2(3))
-  call write_varG(a_MareaTHMC_g_S(:), outvarID2(4))
-  call write_varG(a_MrH2OlLC_S(:) , outvarID2(5))
-  call write_varG(a_MrH2OlDC_S(:) , outvarID2(6))
-  call write_varG(a_MrH2OlCC_S(:) , outvarID2(7))
-  call write_varG(a_MrH2OlMC_S(:) , outvarID2(8))
-  call write_varG(a_MTsLC_S(:)    , outvarID2(9))
-  call write_varG(a_MTsDC_S(:)    , outvarID2(10))
-  call write_varG(a_MTsCC_S(:)    , outvarID2(11))
-  call write_varG(a_MTsMC_S(:)    , outvarID2(12))
-  call write_varG(a_MfCcbLC_S(:)  , outvarID2(13))
-  call write_varG(a_MfCcbDC_S(:)  , outvarID2(14))
-  call write_varG(a_MfCcbCC_S(:)  , outvarID2(15))
-  call write_varG(a_MfCcbMC_S(:)  , outvarID2(16))
+    call write_varG(a_MareaTHLC_g_S(:), outvarID2(1),  "a_MareaTHLC_g_S")
+  call write_varG(a_MareaTHDC_g_S(:), outvarID2(2),  "a_MareaTHDC_g_S")
+  call write_varG(a_MareaTHCC_g_S(:), outvarID2(3),  "a_MareaTHCC_g_S")
+  call write_varG(a_MareaTHMC_g_S(:), outvarID2(4),  "a_MareaTHMC_g_S")
+  call write_varG(a_MrH2OlLC_S(:)   , outvarID2(5),  "a_MrH2OlLC_S")
+  call write_varG(a_MrH2OlDC_S(:)   , outvarID2(6),  "a_MrH2OlDC_S")
+  call write_varG(a_MrH2OlCC_S(:)   , outvarID2(7),  "a_MrH2OlCC_S")
+  call write_varG(a_MrH2OlMC_S(:)   , outvarID2(8),  "a_MrH2OlMC_S")
+  call write_varG(a_MTsLC_S(:)      , outvarID2(9),  "a_MTsLC_S")
+  call write_varG(a_MTsDC_S(:)      , outvarID2(10), "a_MTsDC_S")
+  call write_varG(a_MTsCC_S(:)      , outvarID2(11), "a_MTsCC_S")
+  call write_varG(a_MTsMC_S(:)      , outvarID2(12), "a_MTsMC_S")
+  call write_varG(a_MfCcbLC_S(:)    , outvarID2(13), "a_MfCcbLC_S")
+  call write_varG(a_MfCcbDC_S(:)    , outvarID2(14), "a_MfCcbDC_S")
+  call write_varG(a_MfCcbCC_S(:)    , outvarID2(15), "a_MfCcbCC_S")
+  call write_varG(a_MfCcbMC_S(:)    , outvarID2(16), "a_MfCcbMC_S")
 
   if (NOHONO) then
 
-    call write_varG(a_MfNO_N(:)   , outvarID2(20))
-    call write_varG(a_MfHONO_N(:) , outvarID2(21))
+    call write_varG(a_MfNO_N(:)   , outvarID2(20), "a_MfNO_N")
+    call write_varG(a_MfHONO_N(:) , outvarID2(21), "a_MfHONO_N")
   endif
 endif
 
@@ -1269,7 +1399,7 @@ if (rank .eq. 0) then
 !  if (out1) then
 
     ! Create global output file
-    call check(nf90_create(sfile_outputGS, NF90_CLOBBER, outIDS))
+    call check(nf90_create(sfile_outputGS, IOR(NF90_CLOBBER, NF90_64BIT_OFFSET), outIDS))
 
     ! Define dimensions.
     call check(nf90_def_dim(outIDS, "lon", nx, x_dimID))    ! returns dimID
@@ -1326,19 +1456,19 @@ if (rank .eq. 0) then
 endif
 
 ! write species properties
-call write_varG(count_spec(:), outvarIDS(1))
+call write_varG(count_spec(:), outvarIDS(1), "count_spec")
 
 i0 = 0
 
 do l = 1,p_nhabA
 
-  call write_varG(count_spec_h(l,:), outvarIDS(1+l))
+  call write_varG(count_spec_h(l,:), outvarIDS(1+l), "count_spec_h")
 
   do k = 1,p_nspecpar
 
     i0 = i0 + 1
 
-    call write_varG(vec_o_avg(k,l,:), outvarIDS(1+p_nhabA+i0))
+    call write_varG(vec_o_avg(k,l,:), outvarIDS(1+p_nhabA+i0), "vec_o_avg")
   enddo
 enddo
 
@@ -1396,7 +1526,8 @@ if (rank .eq. 0) then
  ! E_Tratio, &
   xpos, &
   ypos, &
-  indvec )
+  indvec, &
+  indvec1 )
 endif
 
 write(*,*) "Proc:  ",rank, "  LAI",size(laidata)

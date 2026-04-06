@@ -6,8 +6,8 @@
 #
 # name of binary
 #
-vname="8Feb_2_100species_30year_veg_current" #t3fO  #_21"  #"H6C6sp"
-expname="8Feb_2_100species_30year_veg_current" #-n8c36
+vname="6apr_100species_30year_veg_paleo" #t3fO  #_21"  #"H6C6sp"
+expname="6apr_100species_30year_veg_paleo" #-n8c36
 #
 model="lycom_${vname}.x"
 #
@@ -39,13 +39,13 @@ lnoVeg=".true."
 #
 if [[ $lsf == 1 ]]
 then
-  basedir=/beegfs/u/bas7785/lycom_current
+  basedir=/beegfs/u/bas7785/Paleo_2026/
 
   bindir=${basedir}/binaries
 
   rundir=/beegfs/u/bas7785/simulations/${expname}
 
-  inputdir=/beegfs/u/bas7785/postprocessed/
+  inputdir=/beegfs/u/bas7785/Paleo_data/
  
 else
   basedir=/beegfs/u/bas7785/lycom_current
@@ -129,7 +129,7 @@ yearoutX=${endout},
 outint=${intvout},
 nSites=1,
 p_nspec=${nspecies},
-frac_s_init=0.0,
+frac_s_init=0.5,
 specout=.true.,
 interCan=.false.,
 NOHONO=${lNOHONO},

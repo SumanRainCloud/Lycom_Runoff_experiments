@@ -9,7 +9,7 @@ para=1
 
 
 
-a0=25Jan_100species_30year_veg_current
+a0=6apr_100species_30year_veg_paleo
 
 if [ -e "lycom.x" ]
 then
