@@ -61,7 +61,7 @@ integer                 :: rank                                         ! rank o
 integer                 :: runperiod                                         ! rank of processor
 integer                 :: tpos0                                         ! rank of processor
 integer                 :: tsindata0                                         ! rank of processor
-integer                 :: accts0 = 0                                        ! rank of processor
+integer                 :: accts0= 0                                         ! rank of processor
 integer                 :: year0                                         ! rank of processor
 integer                 :: numproc                                      ! number of processors
 integer                 :: nx, ny                                       ! lon, lat
@@ -511,10 +511,10 @@ real, allocatable       :: res_por(:)
 
 real, parameter         :: p_critD              = 1.0E-12               ! critical value for any denominator
 
-integer, parameter      :: p_ntiles             = 1                     ! number of tiles (1=forest, 2=bare/grass, 3=wetland, 4=rocks)
+integer, parameter      :: p_ntiles             = 1!4                     ! number of tiles (1=forest, 2=bare/grass, 3=wetland, 4=rocks)
 integer, parameter      :: p_nvertM             = 1                     ! max number of levels (1=ground, 2=canopy)
 integer, parameter      :: p_nhabM              = 1                     ! max number of habitats (1=stems, 2=leaves)
-integer, parameter      :: p_nhabA              = 1                     ! actual number of habitats (sum of stems, leaves, forest floor, bare/grass)
+integer, parameter      :: p_nhabA              = 1!4                     ! actual number of habitats (sum of stems, leaves, forest floor, bare/grass)
 integer, parameter      :: nsoil=5
 integer, dimension(p_ntiles) :: p_nvert                                 ! number of vertical levels per tile(n=4)
 integer, dimension(p_ntiles,p_nvertM) :: p_nhab                         ! number of habitats per level(nmax=2)

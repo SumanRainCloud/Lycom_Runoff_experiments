@@ -456,7 +456,7 @@ if (writeout) then
   ah_fCc_gpp(h)                 = as_fCc_gpp
   
   ah_fCc_npp(h)                 = as_fCc_npp
-  
+
   ah_fH2Ol_bsat(h)              =bucket_con0*(1.0-as_area_s)+as_fH2Ol_bsat * as_area_s
   ah_fCO2gc(h)                  = as_fCO2gc
   
@@ -793,37 +793,38 @@ if (writeout) then
 
       ! average tiles per grid cell (i) - separate output (C,G) for several properties
       !ag_fH2Ol_ux(i,l)          = ag_fH2Ol_ux(i,l)  + at_fH2Ol_ux(k,l) * frac_tile(i,k)
-      ag_fH2Ol_xd(i,l)          = ag_fH2Ol_xd(i,l) + at_fH2Ol_xd(k,l) * frac_tile(i,k)
+      ag_fH2Ol_xd(i,l)          = ag_fH2Ol_xd(i,l) + at_fH2Ol_xd(k,l) 
 
-      ag_area_s(i,l)          =  ag_area_s(i,l) + at_area_s(k,l) * frac_tile(i,k)
+      ag_area_s(i,l)          =  ag_area_s(i,l) + at_area_s(k,l) 
 
       ag_rH2Ol(i,l)             = ag_rH2Ol(i,l)     + at_rH2Ol(k,l) * frac_tile(i,k)
       ag_rmaxH2Ol(i,l)          = ag_rmaxH2Ol(i,l)  + at_rmaxH2Ol(k,l) * frac_tile(i,k)
       !ag_act(i,l)               = ag_act(i,l)       + at_act(k,l) * frac_tile(i,k)
-      ag_fH2Ol_lsat(i,l)         = ag_fH2Ol_lsat(i,l) + at_fH2Ol_lsat(k,l) * frac_tile(i,k)
-      ag_fH2Ol_bsat(i,l)         = ag_fH2Ol_bsat(i,l) + at_fH2Ol_bsat(k,l) * frac_tile(i,k)
-      ag_fH2Ol_runoff_l(i,l)    = ag_fH2Ol_runoff_l(i,l) + at_fH2Ol_runoff_l(k,l) * frac_tile(i,k)
-      ag_fCc_gpp(i,l)           = ag_fCc_gpp(i,l) + at_fCc_gpp(k,l) * frac_tile(i,k)
-      ag_fCc_npp(i,l)           =  ag_fCc_npp(i,l) + at_fCc_npp(k,l) * frac_tile(i,k)
-      ag_rCO2d(i,l)             =  ag_rCO2d(i,l) + at_rCO2d(k,l) * frac_tile(i,k)
+      ag_fH2Ol_lsat(i,l)         = ag_fH2Ol_lsat(i,l) + at_fH2Ol_lsat(k,l) 
+      ag_fH2Ol_bsat(i,l)         = ag_fH2Ol_bsat(i,l) + at_fH2Ol_bsat(k,l)
+      ag_fH2Ol_runoff_l(i,l)    = ag_fH2Ol_runoff_l(i,l) + at_fH2Ol_runoff_l(k,l) 
+      ag_fCc_gpp(i,l)           = ag_fCc_gpp(i,l) + at_fCc_gpp(k,l)
+      ag_fCc_npp(i,l)           =  ag_fCc_npp(i,l) + at_fCc_npp(k,l)
+      ag_rCO2d(i,l)             =  ag_rCO2d(i,l) + at_rCO2d(k,l) 
       ag_sCO2d(i)             = ag_sCO2d(i)     + at_sCO2d(k) * frac_tile(i,k)
-      ag_rCb(i,l)               =  ag_rCb(i,l) + at_rCb(k,l) * frac_tile(i,k)
-      ag_fCO2gc(i,l)            =  ag_fCO2gc(i,l) + at_fCO2gc(k,l) * frac_tile(i,k)
-      ag_fCcg(i,l)              =  ag_fCcg(i,l) + at_fCcg(k,l) * frac_tile(i,k)
-!      ag_fCcb(i,l)              =  ag_fCcb(i,l) + at_fCcb(k,l) * frac_tile(i,k)
-      ag_fCcb_l(i,l)            =  ag_fCcb_l(i,l) + at_fCcb_l(k,l) * frac_tile(i,k)
-      ag_fCcb_c(i,l)            =  ag_fCcb_c(i,l) + at_fCcb_c(k,l) * frac_tile(i,k)
-      ag_fCbo(i,l)              =  ag_fCbo(i,l) + at_fCbo(k,l) * frac_tile(i,k)
+      ag_rCb(i,l)               =  ag_rCb(i,l) + at_rCb(k,l) 
+      ag_fCO2gc(i,l)            =  ag_fCO2gc(i,l) + at_fCO2gc(k,l) 
+      ag_fCcg(i,l)              =  ag_fCcg(i,l) + at_fCcg(k,l) 
+!      ag_fCcb(i,l)              =  ag_fCcb(i,l) + at_fCcb(k,l) 
+      ag_fCcb_l(i,l)            =  ag_fCcb_l(i,l) + at_fCcb_l(k,l)
+      ag_fCcb_c(i,l)            =  ag_fCcb_c(i,l) + at_fCcb_c(k,l) 
+      ag_fCbo(i,l)              =  ag_fCbo(i,l) + at_fCbo(k,l)
 
-      ag_fH2Ogl_ux(i,l)         = ag_fH2Ogl_ux(i,l) + at_fH2Ogl_ux(k,l) * frac_tile(i,k)
-      ag_fH2Olg_xu(i,l)         = ag_fH2Olg_xu(i,l) + at_fH2Olg_xu(k,l) * frac_tile(i,k)
-      ag_fH2Ol_bx(i,l)          = ag_fH2Ol_bx(i,l) + at_fH2Ol_bx(k,l) * frac_tile(i,k)
-      ag_Ts(i,l)                = ag_Ts(i,l) + at_Ts(k,l)* frac_tile(i,k)
-      ag_H(i,l)                 = ag_H(i,l) + at_H(k,l) * frac_tile(i,k)
-      ag_E(i,l)                 = ag_E(i,l) + at_E(k,l) * frac_tile(i,k)
-      ag_C(i,l)                 = ag_C(i,l) + at_C(k,l) * frac_tile(i,k)
+      ag_fH2Ogl_ux(i,l)         = ag_fH2Ogl_ux(i,l) + at_fH2Ogl_ux(k,l) 
+      ag_fH2Olg_xu(i,l)         = ag_fH2Olg_xu(i,l) + at_fH2Olg_xu(k,l) 
+      ag_fH2Ol_bx(i,l)          = ag_fH2Ol_bx(i,l) + at_fH2Ol_bx(k,l) 
+      ag_Ts(i,l)                = ag_Ts(i,l) + at_Ts(k,l)
+      ag_H(i,l)                 = ag_H(i,l) + at_H(k,l) 
+      ag_E(i,l)                 = ag_E(i,l) + at_E(k,l) 
+      ag_C(i,l)                 = ag_C(i,l) + at_C(k,l) 
       !ag_EB(i,l)                = at_EB(i,l) + at_EB(k,l) 
     enddo
+    ag_sCO2d(i)              =  ag_sCO2d(i) +at_sCO2d(k) 
     ag_Tg(i)                    =  ag_Tg(i) +at_Tg(k) 
     ag_G(i)                     =  ag_G(i) + at_G(k) 
     ag_Lai(i)                  = ag_Lai(i)  +at_Lai(k)

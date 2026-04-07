@@ -130,6 +130,10 @@ if (rank .eq. 0) then
   enddo
 
   ! Write output variable
+  !tcode(1) = (year*100 + month)*100 + day
+
+  !call check(nf90_put_var(outID, t_varID, tcode, start = (/tpos/), count = (/1/) ))
+
   call check(nf90_put_var(outID, ovID1, outvar(:,:), start = (/ 1, 1, tpos /), count = (/ nx, ny, 1 /) ))
   
 endif
@@ -197,8 +201,8 @@ character (len=20)      :: dimName, varName0
 ! Open land mask file and determine resolution
 call check(nf90_open(landmask, nf90_nowrite, ncID1) )
 !!!DEBUG -- TEMPORARY FIX FOR PALEO !!!
-!call check(nf90_inquire_dimension(ncID1, 1, dimName, nx) )
-!call check(nf90_inquire_dimension(ncID1, 2, dimName, ny) )
+!!call check(nf90_inquire_dimension(ncID1, 1, dimName, nx) )
+!!call check(nf90_inquire_dimension(ncID1, 2, dimName, ny) )
 
 call check(nf90_inquire_dimension(ncID1, 2, dimName, nx) )      !! TEMPORARY
 call check(nf90_inquire_dimension(ncID1, 3, dimName, ny) )      !! TEMPORARY
@@ -216,16 +220,16 @@ allocate(ypos(ny))
 
 ! Get the values of the coordinates and put them in xpos & ypos
 !!call check(nf90_inquire_variable(ncID1, 1, varName0, xtype, ndims, dimIDs2n))
-!call check(nf90_inquire_variable(ncID1, 1, varName0, xtype, ndims, dimIDs2n))
-!write(*,*) "Reading variable #1"
-!write(*,*) "  --> Name       :", trim(varName0)
-!write(*,*) "  --> Type       :", xtype
-!write(*,*) "  --> Num Dims   :", ndims
-!write(*,*) "  --> DimIDs     :", dimIDs2n(1:ndims)
+call check(nf90_inquire_variable(ncID1, 1, varName0, xtype, ndims, dimIDs2n))
+write(*,*) "Reading variable #1"
+write(*,*) "  --> Name       :", trim(varName0)
+write(*,*) "  --> Type       :", xtype
+write(*,*) "  --> Num Dims   :", ndims
+write(*,*) "  --> DimIDs     :", dimIDs2n(1:ndims)
 
 
 !! TEMPORARY
-call check(nf90_inq_varID(ncID1, "lon", varID))
+call check(nf90_inq_varID(ncID1, varName0, varID))
 call check(nf90_get_var(ncID1, varID, xpos))
 
 write(*,*) "varID (xpos):", varID
@@ -235,17 +239,17 @@ write(*,*) "reached here 1"
 
 
 !!call check(nf90_inquire_variable(ncID1, 2, varName0, xtype, ndims, dimIDs2n))
-!call check(nf90_inquire_variable(ncID1, 2, varName0, xtype, ndims, dimIDs2n))
-!write(*,*) "Reading variable #2"
-!write(*,*) "  --> Name       :", trim(varName0)
-!write(*,*) "  --> Type       :", xtype
-!write(*,*) "  --> Num Dims   :", ndims
-!write(*,*) "  --> DimIDs     :", dimIDs2n(1:ndims)
+call check(nf90_inquire_variable(ncID1, 2, varName0, xtype, ndims, dimIDs2n))
+write(*,*) "Reading variable #2"
+write(*,*) "  --> Name       :", trim(varName0)
+write(*,*) "  --> Type       :", xtype
+write(*,*) "  --> Num Dims   :", ndims
+write(*,*) "  --> DimIDs     :", dimIDs2n(1:ndims)
 
 
 
 !! TEMPORARY
-call check(nf90_inq_varID(ncID1, "lat", varID))
+call check(nf90_inq_varID(ncID1, varName0, varID))
 call check(nf90_get_var(ncID1, varID, ypos))
 write(*,*) "varID (ypos):", varID
 write(*,*) "ypos sample:", ypos(1:min(5,ny))
@@ -1168,6 +1172,7 @@ if (rank .eq. 0) then
   call check(nf90_put_var(outID, t_varID, tcode, start = (/tpos/), count = (/1/) ))
 endif
 ! Write output (variable, code, outfileID, dimensions)
+
 do k = 1,1
   call write_varG(ag_rCO2d(:,k)     ,  outvarID(1+25*(k-1)))
 !  call write_varG(ag_sCO2d(:,k)     ,  outvarID(2+25*(k-1))) !commented out
