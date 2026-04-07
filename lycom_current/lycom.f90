@@ -216,7 +216,7 @@ do i = 1,nCPts3
   enddo
 enddo
 
-frac_s_crit                   = frac_s_init/real(p_nspec) *fracratiocrit
+frac_s_crit                   = 0;   !frac_s_init/real(p_nspec) *fracratiocrit
 !The alive constraints need to be changed!!!!! LOOK INTO THIS AFTER COMPLETING THE CODES!!SHOULD CONTAIN WITH RESPECT TO BIOMASS!!
 !write (*,*) "LYcophyte_init: is ending"
 

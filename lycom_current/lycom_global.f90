@@ -33,19 +33,25 @@ contains
 ! DEFINE GLOBAL OUTPUT VARIABLES
 !---------------------------------------------------------------
 
-subroutine def_varG (code0, ovID0)
+subroutine def_varG(fileID, code0, ovID0)
 use lycom_par
 use netcdf
 use lycom_nc
 implicit none
 
-integer, intent(in)                     :: code0
-integer, intent(out)                    :: ovID0
-character (len=8)                       :: vd0
+integer, intent(in)  :: fileID
+integer, intent(in)  :: code0
+integer, intent(out) :: ovID0
+character(len=8)     :: vd0
+real(dp)             :: fillv
 
-! Define output variables
-write(vd0,'(A4,I4)') "code",code0
-call check(nf90_def_var(outID, vd0, NF90_REAL, dimIDs3, ovID0)) ! returns outvarID
+fillv = real(-9999.0d0, dp)
+
+write(vd0,'(A4,I4)') "code", code0
+
+call check(nf90_def_var(fileID, vd0, NF90_DOUBLE, dimIDs3, ovID0))
+call check(nf90_put_att(fileID, ovID0, "_FillValue", fillv))
+call check(nf90_put_att(fileID, ovID0, "missing_value", fillv))
 
 return
 end subroutine def_varG
@@ -53,85 +59,95 @@ end subroutine def_varG
 
 ! WRITE GLOBAL OUTPUT VARIABLES
 !---------------------------------------------------------------
-subroutine write_varG (var0, ovID1)
+subroutine write_varG(fileID, var0, ovID1)
 use lycom_par
 use netcdf
 use lycom_nc
 use mpi
 implicit none
 
-integer                 :: i,k,l
-integer                 :: mperr
-integer                 :: ovID1
-integer, dimension(1)   :: tcode
-real(dp)                    :: test_val
+integer, intent(in) :: fileID
+integer, intent(in) :: ovID1
+integer :: i, k, l
+integer :: mperr
+integer :: my_nvalid
+real(dp) :: test_val
 
-real(dp), dimension(pp) :: var0
-
-real(dp), allocatable, dimension(:) :: var1      !(ppnp)
-real(dp), allocatable, dimension(:) :: outvarL   !(nland)
-real(dp), allocatable, dimension(:,:) :: outvar    !(nx,ny)
+real(dp), intent(inout), dimension(pp) :: var0
+real(dp), allocatable, dimension(:)   :: var1
+real(dp), allocatable, dimension(:)   :: outvarL
+real(dp), allocatable, dimension(:,:) :: outvar
 
 allocate(var1(ppnp))
 allocate(outvarL(nland))
 allocate(outvar(nx,ny))
 
-! Clean input data
-do i = 1, pp
+my_nvalid = ppvec(rank+1)
+
+if (my_nvalid < pp) then
+  var0(my_nvalid+1:pp) = -9999.0d0
+endif
+
+do i = 1, my_nvalid
   test_val = var0(i)
-  if (test_val .ne. test_val .or. abs(test_val) .gt. 1.0e30) then
-    var0(i) = -9999.0
+  if (test_val .ne. test_val .or. abs(test_val) .gt. 1.0d30) then
+    write(*,*) "BAD LOCAL VALUE"
+    write(*,*) " rank=", rank, " i=", i, " ovID1=", ovID1, " tpos=", tpos
+    write(*,*) " value=", test_val
+    stop
   endif
 enddo
 
 call MPI_BARRIER(MPI_COMM_WORLD, mperr)
 
-! Gather output variable - FIXED: Use MPI_DOUBLE_PRECISION
-call MPI_GATHER( var0, pp, MPI_DOUBLE_PRECISION, var1, pp, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mperr )
+call MPI_GATHER(var0, pp, MPI_DOUBLE_PRECISION, &
+                var1, pp, MPI_DOUBLE_PRECISION, &
+                0, MPI_COMM_WORLD, mperr)
 
 call MPI_BARRIER(MPI_COMM_WORLD, mperr)
 
 if (rank .eq. 0) then
 
-  ! assemble list of output points from all processors
-  k=1
-  do i = 1,numproc
+  k = 1
+  do i = 1, numproc
     outvarL(k:k+ppvec(i)-1) = var1((i-1)*pp+1:(i-1)*pp+ppvec(i))
     k = k + ppvec(i)
   enddo
 
-  ! Clean outvarL
   do l = 1, nland
     test_val = outvarL(l)
-    if (test_val .ne. test_val .or. abs(test_val) .gt. 1.0e30) then
-      outvarL(l) = -9999.0
+    if (test_val .ne. test_val .or. abs(test_val) .gt. 1.0d30) then
+      write(*,*) "BAD GATHERED VALUE"
+      write(*,*) " l=", l, " ovID1=", ovID1, " tpos=", tpos
+      write(*,*) " value=", test_val
+      stop
     endif
   enddo
 
-  ! Initialize outvar with fill value
-  outvar(:,:) = -9999.0
+  outvar(:,:) = -9999.0d0
 
-  ! distribute list of output land points to output map
-  do l=1,nland
+  do l = 1, nland
     if (indvec1(l,1) .ge. 1 .and. indvec1(l,1) .le. nx .and. &
         indvec1(l,2) .ge. 1 .and. indvec1(l,2) .le. ny) then
-      outvar(indvec1(l,1),indvec1(l,2)) = outvarL(l)
+      outvar(indvec1(l,1), indvec1(l,2)) = outvarL(l)
     endif
   enddo
 
-  ! Final cleanup
   do i = 1, nx
     do k = 1, ny
       test_val = outvar(i,k)
-      if (test_val .ne. test_val .or. abs(test_val) .gt. 1.0e30) then
-        outvar(i,k) = -9999.0
+      if (test_val .ne. test_val .or. abs(test_val) .gt. 1.0d30) then
+        write(*,*) "BAD OUTPUT GRID VALUE"
+        write(*,*) " ix=", i, " iy=", k, " ovID1=", ovID1, " tpos=", tpos
+        write(*,*) " value=", test_val
+        stop
       endif
     enddo
   enddo
 
-  ! Write output variable
-  call check(nf90_put_var(outID, ovID1, outvar(:,:), start = (/ 1, 1, tpos /), count = (/ nx, ny, 1 /) ))
-  
+  call check(nf90_put_var(fileID, ovID1, outvar, &
+       start=(/1,1,tpos/), count=(/nx,ny,1/)))
+
 endif
 
 deallocate(var1)
@@ -140,7 +156,6 @@ deallocate(outvar)
 
 return
 end subroutine write_varG
-
 
 end module lycom_global2
 
@@ -254,7 +269,8 @@ write(*,*) "reached here 2"
 
 ! Get the values of the land data and put them in lsdata
 call check(nf90_inq_varID(ncID1, varName, varID))
-call check(nf90_get_var(ncID1, varID, lsdata))
+call check(nf90_get_var(ncID1, varID, lsdata, &
+     start=(/1,1,1/), count=(/nx,ny,1/)))
 call check(nf90_close(ncID1))
 
 ! Open one climate data file (tair) and read length
@@ -587,7 +603,8 @@ enddo
 ! SSA
 call check(nf90_open(landmask, nf90_nowrite, ncID) )
 call check(nf90_inq_varID(ncID, varName, varID))
-call check(nf90_get_var(ncID, varID, bcdata2))
+call check(nf90_get_var(ncID, varID, bcdata2, &
+     start=(/1,1,1/), count=(/nx,ny,1/)))
 write(*,*) "start SSA"
 !call check(nf90_get_var(ncID, varID, bcdata2, start = (/ 1, 1, 1 /), count = (/ nx, ny, 1 /) ))    !!  TEMPORARY
 
@@ -1081,74 +1098,74 @@ if (rank .eq. 0) then
     ! Define output variables
 
     do k = 1,1
-      call def_varG(k*1000+kfile_rCO2d          ,  outvarID(1+25*(k-1)))
-!      call def_varG(k*1000+kfile_sCO2d          ,  outvarID(2+25*(k-1)))
-      call def_varG(k*1000+kfile_rCb            ,  outvarID(3+25*(k-1)))
-      call def_varG(k*1000+kfile_rH2Ol          ,  outvarID(4+25*(k-1)))
-      call def_varG(k*1000+kfile_rmaxH2Ol       ,  outvarID(5+25*(k-1)))
-      call def_varG(k*1000+kfile_area           ,  outvarID(6+25*(k-1)))
-      call def_varG(k*1000+kfile_act            ,  outvarID(7+25*(k-1)))
-      call def_varG(k*1000+kfile_fCO2gc         ,  outvarID(8+25*(k-1)))
-      call def_varG(k*1000+kfile_fCcg           ,  outvarID(9+25*(k-1)))
-      call def_varG(k*1000+kfile_fCcb           ,  outvarID(10+25*(k-1)))
-      call def_varG(k*1000+kfile_fCbo           , outvarID(11+25*(k-1)))
-      call def_varG(k*1000+kfile_fH2Ol_ux       , outvarID(12+25*(k-1)))
-      call def_varG(k*1000+kfile_fH2Ol_lsat     , outvarID(13+25*(k-1)))
-      call def_varG(k*1000+kfile_fH2Ol_bsat     , outvarID(14+25*(k-1)))
-      call def_varG(k*1000+kfile_fH2Ol_runoff_l , outvarID(15+25*(k-1)))
-      call def_varG(k*1000+kfile_fCc_gpp        , outvarID(16+25*(k-1)))
-      call def_varG(k*1000+kfile_fCc_npp        , outvarID(17+25*(k-1)))      
-      call def_varG(k*1000+kfile_fH2Ol_xd       , outvarID(18+25*(k-1)))
-      call def_varG(k*1000+kfile_fH2Ogl_ux      , outvarID(19+25*(k-1)))
-      call def_varG(k*1000+kfile_fH2Olg_xu      , outvarID(20+25*(k-1)))
-      call def_varG(k*1000+kfile_Ts             , outvarID(21+25*(k-1)))
-!      call def_varG(k*1000+kfile_Ts_N           , outvarID(16+20*(k-1)))
-      call def_varG(k*1000+kfile_H              , outvarID(22+25*(k-1)))
-      call def_varG(k*1000+kfile_E              , outvarID(23+25*(k-1)))
-      call def_varG(k*1000+kfile_C              , outvarID(24+25*(k-1)))
-      call def_varG(k*1000+kfile_EB             , outvarID(25+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_rCO2d          ,  outvarID(1+25*(k-1)))
+!      call def_varG(outID, k*1000+kfile_sCO2d          ,  outvarID(2+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_rCb            ,  outvarID(3+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_rH2Ol          ,  outvarID(4+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_rmaxH2Ol       ,  outvarID(5+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_area           ,  outvarID(6+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_act            ,  outvarID(7+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_fCO2gc         ,  outvarID(8+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_fCcg           ,  outvarID(9+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_fCcb           ,  outvarID(10+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_fCbo           , outvarID(11+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_fH2Ol_ux       , outvarID(12+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_fH2Ol_lsat     , outvarID(13+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_fH2Ol_bsat     , outvarID(14+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_fH2Ol_runoff_l , outvarID(15+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_fCc_gpp        , outvarID(16+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_fCc_npp        , outvarID(17+25*(k-1)))      
+      call def_varG(outID, k*1000+kfile_fH2Ol_xd       , outvarID(18+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_fH2Ogl_ux      , outvarID(19+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_fH2Olg_xu      , outvarID(20+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_Ts             , outvarID(21+25*(k-1)))
+!      call def_varG(outID, k*1000+kfile_Ts_N           , outvarID(16+20*(k-1)))
+      call def_varG(outID, k*1000+kfile_H              , outvarID(22+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_E              , outvarID(23+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_C              , outvarID(24+25*(k-1)))
+      call def_varG(outID, k*1000+kfile_EB             , outvarID(25+25*(k-1)))
     enddo
 
-    call def_varG(3000+kfile_rH2Ol_g1           , outvarID(100)) ! must be larger than highest index of outvarID 3 lines above
-    call def_varG(3000+kfile_rH2Ol_g2           , outvarID(101))
-    call def_varG(3000+kfile_rH2Os_g            , outvarID(102))
-    call def_varG(3000+kfile_fH2Ol_ug           , outvarID(103))
-    call def_varG(3000+kfile_fH2Ol_ug2          , outvarID(104))
-    call def_varG(3000+kfile_fH2Ol_go           , outvarID(105))
-    call def_varG(3000+kfile_fH2Ol_gb           , outvarID(106))
-    call def_varG(3000+kfile_fH2Olg_ga          , outvarID(107))
-    call def_varG(3000+kfile_fH2Osl_g           , outvarID(108))
-    call def_varG(3000+kfile_fH2Os_ad           , outvarID(109))
-    call def_varG(3000+kfile_fH2Ol_ad           , outvarID(110))
-    call def_varG(3000+kfile_xT_a               , outvarID(111))
-    call def_varG(3000+kfile_Tg                 , outvarID(112)) 
-    call def_varG(3000+kfile_G                  , outvarID(113))
-    call def_varG(3000+kfile_fRADs              , outvarID(114))
-    call def_varG(3000+kfile_sCO2d              , outvarID(115))
-    call def_varG(3000+kfile_Lai                , outvarID(116))
+    call def_varG(outID, 3000+kfile_rH2Ol_g1           , outvarID(100)) ! must be larger than highest index of outvarID 3 lines above
+    call def_varG(outID, 3000+kfile_rH2Ol_g2           , outvarID(101))
+    call def_varG(outID, 3000+kfile_rH2Os_g            , outvarID(102))
+    call def_varG(outID, 3000+kfile_fH2Ol_ug           , outvarID(103))
+    call def_varG(outID, 3000+kfile_fH2Ol_ug2          , outvarID(104))
+    call def_varG(outID, 3000+kfile_fH2Ol_go           , outvarID(105))
+    call def_varG(outID, 3000+kfile_fH2Ol_gb           , outvarID(106))
+    call def_varG(outID, 3000+kfile_fH2Olg_ga          , outvarID(107))
+    call def_varG(outID, 3000+kfile_fH2Osl_g           , outvarID(108))
+    call def_varG(outID, 3000+kfile_fH2Os_ad           , outvarID(109))
+    call def_varG(outID, 3000+kfile_fH2Ol_ad           , outvarID(110))
+    call def_varG(outID, 3000+kfile_xT_a               , outvarID(111))
+    call def_varG(outID, 3000+kfile_Tg                 , outvarID(112)) 
+    call def_varG(outID, 3000+kfile_G                  , outvarID(113))
+    call def_varG(outID, 3000+kfile_fRADs              , outvarID(114))
+    call def_varG(outID, 3000+kfile_sCO2d              , outvarID(115))
+    call def_varG(outID, 3000+kfile_Lai                , outvarID(116))
     ! Optional variables
     if (BSCtypes) then
-      call def_varG(kfile_MareaLCgS     , outvarID2(1))                
-      call def_varG(kfile_MareaDCgS     , outvarID2(2))                
-      call def_varG(kfile_MareaCCgS     , outvarID2(3))
-      call def_varG(kfile_MareaMCgS     , outvarID2(4))
-      call def_varG(kfile_MrH2OlLC_S    , outvarID2(5))
-      call def_varG(kfile_MrH2OlDC_S    , outvarID2(6))
-      call def_varG(kfile_MrH2OlCC_S    , outvarID2(7))
-      call def_varG(kfile_MrH2OlMC_S    , outvarID2(8))
-      call def_varG(kfile_MTsLC_S       , outvarID2(9))
-      call def_varG(kfile_MTsDC_S       , outvarID2(10))
-      call def_varG(kfile_MTsCC_S       , outvarID2(11))
-      call def_varG(kfile_MTsMC_S       , outvarID2(12))
-      call def_varG(kfile_MfCcbLC_S     , outvarID2(13))
-      call def_varG(kfile_MfCcbDC_S     , outvarID2(14))
-      call def_varG(kfile_MfCcbCC_S     , outvarID2(15))
-      call def_varG(kfile_MfCcbMC_S     , outvarID2(16))
+      call def_varG(outID, kfile_MareaLCgS     , outvarID2(1))                
+      call def_varG(outID, kfile_MareaDCgS     , outvarID2(2))                
+      call def_varG(outID, kfile_MareaCCgS     , outvarID2(3))
+      call def_varG(outID, kfile_MareaMCgS     , outvarID2(4))
+      call def_varG(outID, kfile_MrH2OlLC_S    , outvarID2(5))
+      call def_varG(outID, kfile_MrH2OlDC_S    , outvarID2(6))
+      call def_varG(outID, kfile_MrH2OlCC_S    , outvarID2(7))
+      call def_varG(outID, kfile_MrH2OlMC_S    , outvarID2(8))
+      call def_varG(outID, kfile_MTsLC_S       , outvarID2(9))
+      call def_varG(outID, kfile_MTsDC_S       , outvarID2(10))
+      call def_varG(outID, kfile_MTsCC_S       , outvarID2(11))
+      call def_varG(outID, kfile_MTsMC_S       , outvarID2(12))
+      call def_varG(outID, kfile_MfCcbLC_S     , outvarID2(13))
+      call def_varG(outID, kfile_MfCcbDC_S     , outvarID2(14))
+      call def_varG(outID, kfile_MfCcbCC_S     , outvarID2(15))
+      call def_varG(outID,kfile_MfCcbMC_S     , outvarID2(16))
 
       if (NOHONO) then
 
-        call def_varG(kfile_MfNO_N      , outvarID2(20))
-        call def_varG(kfile_MfHONO_N    , outvarID2(21))
+        call def_varG(outID, kfile_MfNO_N      , outvarID2(20))
+        call def_varG(outID, kfile_MfHONO_N    , outvarID2(21))
       endif
     endif
 
@@ -1169,75 +1186,75 @@ if (rank .eq. 0) then
 endif
 ! Write output (variable, code, outfileID, dimensions)
 do k = 1,1
-  call write_varG(ag_rCO2d(:,k)     ,  outvarID(1+25*(k-1)))
-!  call write_varG(ag_sCO2d(:,k)     ,  outvarID(2+25*(k-1))) !commented out
-  call write_varG(ag_rCb(:,k)       ,  outvarID(3+25*(k-1)))
-  call write_varG(ag_rH2Ol(:,k)     ,  outvarID(4+25*(k-1)))
-  call write_varG(ag_rmaxH2Ol(:,k)  ,  outvarID(5+25*(k-1)))
-  call write_varG(ag_area_s(:,k)  ,  outvarID(6+25*(k-1)))
-  call write_varG(ag_act(:,k)       ,  outvarID(7+25*(k-1)))
-  call write_varG(ag_fCO2gc(:,k)    ,  outvarID(8+25*(k-1)))
-  call write_varG(ag_fCcg(:,k)      ,  outvarID(9+25*(k-1)))
-  call write_varG(ag_fCcb(:,k)      ,  outvarID(10+25*(k-1)))
-  call write_varG(ag_fCbo(:,k)      , outvarID(11+25*(k-1)))
-  call write_varG(ag_fH2Ol_ux(:,k)  , outvarID(12+25*(k-1)))
-  call write_varG(ag_fH2Ol_lsat(:,k), outvarID(13+25*(k-1)))
-  call write_varG(ag_fH2Ol_bsat(:,k), outvarID(14+25*(k-1)))
-  call write_varG(ag_fH2Ol_runoff_l(:,k), outvarID(15+25*(k-1)))
-  call write_varG(ag_fCc_gpp(:,k)   , outvarID(16+25*(k-1)))
-  call write_varG(ag_fCc_npp(:,k)   , outvarID(17+25*(k-1)))
-  call write_varG(ag_fH2Ol_xd(:,k)  , outvarID(18+25*(k-1)))
+  call write_varG(outID, ag_rCO2d(:,k)     ,  outvarID(1+25*(k-1)))
+!  call write_varG(outID, ag_sCO2d(:,k)     ,  outvarID(2+25*(k-1))) !commented out
+  call write_varG(outID, ag_rCb(:,k)       ,  outvarID(3+25*(k-1)))
+  call write_varG(outID, ag_rH2Ol(:,k)     ,  outvarID(4+25*(k-1)))
+  call write_varG(outID, ag_rmaxH2Ol(:,k)  ,  outvarID(5+25*(k-1)))
+  call write_varG(outID, ag_area_s(:,k)  ,  outvarID(6+25*(k-1)))
+  call write_varG(outID, ag_act(:,k)       ,  outvarID(7+25*(k-1)))
+  call write_varG(outID, ag_fCO2gc(:,k)    ,  outvarID(8+25*(k-1)))
+  call write_varG(outID, ag_fCcg(:,k)      ,  outvarID(9+25*(k-1)))
+  call write_varG(outID, ag_fCcb(:,k)      ,  outvarID(10+25*(k-1)))
+  call write_varG(outID, ag_fCbo(:,k)      , outvarID(11+25*(k-1)))
+  call write_varG(outID, ag_fH2Ol_ux(:,k)  , outvarID(12+25*(k-1)))
+  call write_varG(outID, ag_fH2Ol_lsat(:,k), outvarID(13+25*(k-1)))
+  call write_varG(outID, ag_fH2Ol_bsat(:,k), outvarID(14+25*(k-1)))
+  call write_varG(outID, ag_fH2Ol_runoff_l(:,k), outvarID(15+25*(k-1)))
+  call write_varG(outID, ag_fCc_gpp(:,k)   , outvarID(16+25*(k-1)))
+  call write_varG(outID, ag_fCc_npp(:,k)   , outvarID(17+25*(k-1)))
+  call write_varG(outID, ag_fH2Ol_xd(:,k)  , outvarID(18+25*(k-1)))
   
-  call write_varG(ag_fH2Ogl_ux(:,k) , outvarID(19+25*(k-1)))
-  call write_varG(ag_fH2Olg_xu(:,k) , outvarID(20+25*(k-1)))
-  call write_varG(ag_Ts(:,k)        , outvarID(21+25*(k-1)))
-!  call write_varG(ag_Ts_N(:,k)      , outvarID(16+20*(k-1)))
-  call write_varG(ag_H(:,k)         , outvarID(22+25*(k-1)))
-  call write_varG(ag_E(:,k)         , outvarID(23+25*(k-1)))
-  call write_varG(ag_C(:,k)         , outvarID(24+25*(k-1)))
-  call write_varG(ag_EB(:,k)        , outvarID(25+25*(k-1)))
+  call write_varG(outID, ag_fH2Ogl_ux(:,k) , outvarID(19+25*(k-1)))
+  call write_varG(outID, ag_fH2Olg_xu(:,k) , outvarID(20+25*(k-1)))
+  call write_varG(outID, ag_Ts(:,k)        , outvarID(21+25*(k-1)))
+!  call write_varG(outID, ag_Ts_N(:,k)      , outvarID(16+20*(k-1)))
+  call write_varG(outID, ag_H(:,k)         , outvarID(22+25*(k-1)))
+  call write_varG(outID, ag_E(:,k)         , outvarID(23+25*(k-1)))
+  call write_varG(outID, ag_C(:,k)         , outvarID(24+25*(k-1)))
+  call write_varG(outID, ag_EB(:,k)        , outvarID(25+25*(k-1)))
 enddo
-call write_varG(ag_Lai(:)             , outvarID(116))
-call write_varG(ag_sCO2d(:)           , outvarID(115))
-call write_varG(ag_rH2Ol_g1(:)        , outvarID(100))
-call write_varG(ag_rH2Ol_g2(:)        , outvarID(101))
-call write_varG(ag_rH2Os_g(:)         , outvarID(102))
-call write_varG(ag_fH2Ol_ug(:)        , outvarID(103))
-call write_varG(ag_fH2Ol_ug2(:)       , outvarID(104))
-call write_varG(ag_fH2Ol_go(:)        , outvarID(105))
-call write_varG(ag_fH2Ol_gb(:)        , outvarID(106))
-call write_varG(ag_fH2Olg_ga(:)       , outvarID(107))
-call write_varG(ag_fH2Osl_g(:)        , outvarID(108))
-call write_varG(ag_fH2Os_ad(:)        , outvarID(109))
-call write_varG(ag_fH2Ol_ad(:)        , outvarID(110))
-call write_varG(ag_xT_a(:)            , outvarID(111))
-call write_varG(ag_Tg(:)              , outvarID(112)) 
-call write_varG(ag_G(:)               , outvarID(113))
-call write_varG(ag_fRADs(:)           , outvarID(114))
+call write_varG(outID, ag_Lai(:)             , outvarID(116))
+call write_varG(outID, ag_sCO2d(:)           , outvarID(115))
+call write_varG(outID, ag_rH2Ol_g1(:)        , outvarID(100))
+call write_varG(outID, ag_rH2Ol_g2(:)        , outvarID(101))
+call write_varG(outID, ag_rH2Os_g(:)         , outvarID(102))
+call write_varG(outID, ag_fH2Ol_ug(:)        , outvarID(103))
+call write_varG(outID, ag_fH2Ol_ug2(:)       , outvarID(104))
+call write_varG(outID, ag_fH2Ol_go(:)        , outvarID(105))
+call write_varG(outID, ag_fH2Ol_gb(:)        , outvarID(106))
+call write_varG(outID, ag_fH2Olg_ga(:)       , outvarID(107))
+call write_varG(outID, ag_fH2Osl_g(:)        , outvarID(108))
+call write_varG(outID, ag_fH2Os_ad(:)        , outvarID(109))
+call write_varG(outID, ag_fH2Ol_ad(:)        , outvarID(110))
+call write_varG(outID, ag_xT_a(:)            , outvarID(111))
+call write_varG(outID, ag_Tg(:)              , outvarID(112)) 
+call write_varG(outID, ag_G(:)               , outvarID(113))
+call write_varG(outID, ag_fRADs(:)           , outvarID(114))
 
 ! Optional output variables
 if (BSCtypes) then
-  call write_varG(a_MareaTHLC_g_S(:), outvarID2(1))                 
-  call write_varG(a_MareaTHDC_g_S(:), outvarID2(2))                 
-  call write_varG(a_MareaTHCC_g_S(:), outvarID2(3))
-  call write_varG(a_MareaTHMC_g_S(:), outvarID2(4))
-  call write_varG(a_MrH2OlLC_S(:) , outvarID2(5))
-  call write_varG(a_MrH2OlDC_S(:) , outvarID2(6))
-  call write_varG(a_MrH2OlCC_S(:) , outvarID2(7))
-  call write_varG(a_MrH2OlMC_S(:) , outvarID2(8))
-  call write_varG(a_MTsLC_S(:)    , outvarID2(9))
-  call write_varG(a_MTsDC_S(:)    , outvarID2(10))
-  call write_varG(a_MTsCC_S(:)    , outvarID2(11))
-  call write_varG(a_MTsMC_S(:)    , outvarID2(12))
-  call write_varG(a_MfCcbLC_S(:)  , outvarID2(13))
-  call write_varG(a_MfCcbDC_S(:)  , outvarID2(14))
-  call write_varG(a_MfCcbCC_S(:)  , outvarID2(15))
-  call write_varG(a_MfCcbMC_S(:)  , outvarID2(16))
+  call write_varG(outID, a_MareaTHLC_g_S(:), outvarID2(1))                 
+  call write_varG(outID, a_MareaTHDC_g_S(:), outvarID2(2))                 
+  call write_varG(outID, a_MareaTHCC_g_S(:), outvarID2(3))
+  call write_varG(outID, a_MareaTHMC_g_S(:), outvarID2(4))
+  call write_varG(outID, a_MrH2OlLC_S(:) , outvarID2(5))
+  call write_varG(outID, a_MrH2OlDC_S(:) , outvarID2(6))
+  call write_varG(outID, a_MrH2OlCC_S(:) , outvarID2(7))
+  call write_varG(outID, a_MrH2OlMC_S(:) , outvarID2(8))
+  call write_varG(outID, a_MTsLC_S(:)    , outvarID2(9))
+  call write_varG(outID, a_MTsDC_S(:)    , outvarID2(10))
+  call write_varG(outID, a_MTsCC_S(:)    , outvarID2(11))
+  call write_varG(outID, a_MTsMC_S(:)    , outvarID2(12))
+  call write_varG(outID, a_MfCcbLC_S(:)  , outvarID2(13))
+  call write_varG(outID, a_MfCcbDC_S(:)  , outvarID2(14))
+  call write_varG(outID, a_MfCcbCC_S(:)  , outvarID2(15))
+  call write_varG(outID, a_MfCcbMC_S(:)  , outvarID2(16))
 
   if (NOHONO) then
 
-    call write_varG(a_MfNO_N(:)   , outvarID2(20))
-    call write_varG(a_MfHONO_N(:) , outvarID2(21))
+    call write_varG(outID, a_MfNO_N(:)   , outvarID2(20))
+    call write_varG(outID, a_MfHONO_N(:) , outvarID2(21))
   endif
 endif
 
@@ -1292,7 +1309,7 @@ if (rank .eq. 0) then
     call check(nf90_put_att(outIDS, t_varID, "calendar", "proleptic_gregorian"))
 
     ! Define output variables
-    call def_varG(kfile_count_spec, outvarIDS(1))
+    call def_varG(outIDS, kfile_count_spec, outvarIDS(1))
 
     i0 = 0
 
@@ -1300,7 +1317,7 @@ if (rank .eq. 0) then
 
       kfile_o_spec = kfile_count_spec + l * 100
 
-      call def_varG(kfile_o_spec, outvarIDS(1+l))
+      call def_varG(outIDS, kfile_o_spec, outvarIDS(1+l))
 
       do k = 1,p_nspecpar
 
@@ -1308,7 +1325,7 @@ if (rank .eq. 0) then
 
         i0 = i0 + 1
 
-        call def_varG(kfile_o_spec, outvarIDS(1+p_nhabA+i0))
+        call def_varG(outIDS,kfile_o_spec, outvarIDS(1+p_nhabA+i0))
       enddo
     enddo
 
@@ -1326,19 +1343,19 @@ if (rank .eq. 0) then
 endif
 
 ! write species properties
-call write_varG(count_spec(:), outvarIDS(1))
+call write_varG(outIDS, count_spec(:), outvarIDS(1))
 
 i0 = 0
 
 do l = 1,p_nhabA
 
-  call write_varG(count_spec_h(l,:), outvarIDS(1+l))
+  call write_varG(outIDS, count_spec_h(l,:), outvarIDS(1+l))
 
   do k = 1,p_nspecpar
 
     i0 = i0 + 1
 
-    call write_varG(vec_o_avg(k,l,:), outvarIDS(1+p_nhabA+i0))
+    call write_varG(outIDS, vec_o_avg(k,l,:), outvarIDS(1+p_nhabA+i0))
   enddo
 enddo
 
@@ -1396,7 +1413,8 @@ if (rank .eq. 0) then
  ! E_Tratio, &
   xpos, &
   ypos, &
-  indvec )
+  indvec, &
+  indvec1 )
 endif
 
 write(*,*) "Proc:  ",rank, "  LAI",size(laidata)
@@ -1421,14 +1439,11 @@ ETdavgdata, &
 ETrmaxdata, &
 ppvec )
 
-!DEBUG
- write( kstatus,* ) "MPI_FINALIZE started"
+if (rank .eq. 0) write(kstatus,*) "MPI_FINALIZE started"
 
-! Stop MPI
 call MPI_FINALIZE(mperr)
 
-!DEBUG
- write( kstatus,* ) "MPI_FINALIZE status:", mperr
+if (rank .eq. 0) write(kstatus,*) "MPI_FINALIZE status:", mperr
 
 return
 end subroutine dealloc_global

@@ -263,12 +263,11 @@ if (BSCtypes) call lycom_deallocBSC
 
 if (para) then
 
-  call dealloc_global ! and stop MPI
-
   if (rank .eq. 0) then
     write( kstatus,* ) "simulation finished"
     close( kstatus )
   endif
+  call dealloc_global
 endif
 
 end
